@@ -6,7 +6,8 @@ import json
 class Common(object):
     def __init__(self, doi):
         self.doi = doi
-        self.cache_dir = "./cache/{0}".format(self.__class__.__name__.lower())
+        self.base_cache = "./cache"
+        self.cache_dir = "{0}/{1}".format(self.base_cache, self.__class__.__name__.lower())
         self.create_cache_dir()
         doi_digest = hashlib.md5(self.doi.encode('utf-8')).hexdigest()
         self.cache_file = os.path.join(self.cache_dir, doi_digest + ".json")
@@ -14,26 +15,40 @@ class Common(object):
     def create_cache_dir(self):
         os.makedirs(self.cache_dir, exist_ok=True)
 
-    def cache_response(self, response_body):
-        file = open(self.cache_file, "w")
+    def cache_response(self, response_body, file):
+        file = open(file, "w")
         file.write(response_body)
         file.close()
 
     def handle_lookup(self, handle):
-        #skip for now
-        return handle
+        #return handle
         #todo verify handle format with regex
-        url = handle.replace("hdl.handle.net", "hdl.handle.net/api/handles")
-        r = requests.get(url)
-        if r.status_code == 200:
-            if r["values"][0]["data"]["value"]:
-                return r["values"][0]["data"]["value"]
-        return handle
+        handle_cache_dir = "{0}/handle".format(self.base_cache)
+        os.makedirs(handle_cache_dir, exist_ok=True)
+        handle_digest = hashlib.md5(handle.encode('utf-8')).hexdigest()
+        handle_cache_file = os.path.join(handle_cache_dir, handle_digest + ".json")
+        response = ""
+        if os.path.isfile(handle_cache_file):
+            print("handle cached")
+            response = json.loads(open(handle_cache_file, 'r').read())
+        else:
+            print("handle not cached")
+            url = handle.replace("hdl.handle.net", "hdl.handle.net/api/handles")
+            r = requests.get(url)
+            if r.status_code == 200:
+                self.cache_response(r.text, handle_cache_file)
+                response = r.json()
+            
+        if response != "":    
+            return response["values"][0]["data"]["value"]
+        else:
+            return handle
 
     def clean_url(self, url):
         url = url.replace("dx.doi.org", "doi.org")
         if "hdl.handle.net" in url:
             url = self.handle_lookup(url)
+            print("-------------------------------------------------------- {0}".format(url))
         return url
 
     def fetch(self):
@@ -55,7 +70,7 @@ class Dissemin(Common):
             r = requests.post('http://dissem.in/api/query', data = payload)
 
         if r.status_code == 200:
-           self.cache_response(r.text)
+           self.cache_response(r.text, self.cache_file)
 
         return r.text
 
@@ -91,7 +106,7 @@ class Oadoi(Common):
         # todo email
         r = requests.get("https://api.oadoi.org/{0}".format(self.doi))
         if r.status_code == 200:
-            self.cache_response(r.text)
+            self.cache_response(r.text, self.cache_file)
 
         return r.text
 
@@ -100,7 +115,7 @@ class OadoiGS(Common):
         # todo email
         r = requests.get("https://api.oadoi.org/gs/cache/{0}".format(self.doi))
         if r.status_code == 200:
-            self.cache_response(r.text)
+            self.cache_response(r.text, self.cache_file)
 
         return r.text
 
@@ -108,7 +123,7 @@ class Crossref(Common):
     def fetch(self):
         r = requests.get("https://api.crossref.org/works/{0}".format(self.doi))
         if r.status_code == 200:
-            self.cache_response(r.text)
+            self.cache_response(r.text, self.cache_file)
 
         return r.text
 
@@ -116,7 +131,7 @@ class Openaire(Common):
     def fetch(self):
         r = requests.get("http://api.openaire.eu/search/publications?doi={0}&format=json".format(self.doi))
         if r.status_code == 200:
-            self.cache_response(r.text)
+            self.cache_response(r.text, self.cache_file)
         else:
             print(r.status_code)
         return r.text
@@ -127,7 +142,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 oa_class = {'Gold' : 0, 'Green' : 0, 'Unknown' : 0}
 green_domain = {}
-with open("ucc_all.txt") as f:
+with open("ucc_scopus_2017_dois.csv") as f:
     for line in f:
         line = line.strip('\n')
         line = line.strip('\r')
@@ -135,17 +150,16 @@ with open("ucc_all.txt") as f:
         record = Dissemin(line).parse()
         if 'classification' in record:
             oa_class[record['classification']] += 1
-            if record['classification'] == 'Green':
+            if 'all_sources' in record:
                 for source in record['all_sources']:
-                    try: 
-                        source_parts = source.split("/")
-                        domain = source_parts[2]
-                       if domain in green_domain:
-                            green_domain[domain] += 1
-                        else:
-                            green_domain[domain] = 1
-                    except:
-                        print("failed to parse")
+                    source_parts = source.split("/")
+                    domain = source_parts[2]
+                    if domain in green_domain:
+                        print("appending domain {0}".format(domain))
+                        green_domain[domain] += 1
+                    else:
+                        print("creating domain {0}".format(domain))
+                        green_domain[domain] = 1
 print(oa_class)
 print(green_domain)
 df = pd.DataFrame.from_dict(oa_class, 'index')

@@ -4,3 +4,4 @@ cache/*
 !cache/.gitkeep
 *.txt
 *.zip
+*.csv
