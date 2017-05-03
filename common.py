@@ -48,7 +48,6 @@ class Common(object):
         url = url.replace("dx.doi.org", "doi.org")
         if "hdl.handle.net" in url:
             url = self.handle_lookup(url)
-            print("-------------------------------------------------------- {0}".format(url))
         return url
 
     def fetch(self):
@@ -78,18 +77,18 @@ class Dissemin(Common):
         output = { 'doi' : self.doi }
         raw = json.loads(self.response())
         if not 'paper' in raw:
-            output['classification'] = 'Unknown'
+            output['classification'] = 'unknown'
             return output
 
         if 'pdf_url' in raw['paper']:
             output["pref_pdf_url"] = raw['paper']['pdf_url']
 
         if 'classification' in raw['paper'] and raw['paper']['classification'] == 'OA':
-            output["classification"] = 'Gold'
+            output["classification"] = 'gold'
         elif 'pdf_url' in raw['paper']:
-            output["classification"] = 'Green'
+            output["classification"] = 'green'
         else:
-            output["classification"] = 'Unknown' 
+            output["classification"] = 'unknown' 
 
         all_sources = []
         for record in raw['paper']['records']:
@@ -109,6 +108,39 @@ class Oadoi(Common):
             self.cache_response(r.text, self.cache_file)
 
         return r.text
+
+    def parse(self):
+        output = { 'doi' : self.doi }
+        raw = json.loads(self.response())
+        if not 'results' in raw:
+            output['classification'] = 'unknown'
+            return output
+ 
+        has_open_url = False
+        result = raw['results'][0]
+        if '_best_open_url' in result and result['_best_open_url'] != None:
+            output["pref_pdf_url"] = result['_best_open_url']
+            has_open_url = True
+
+        if 'oa_color' in result and result['oa_color'] != None:
+            if result['oa_color'] == 'gold':
+                output["classification"] = "gold"
+            elif has_open_url == True:
+                output["classification"] = "green"
+            else:
+                output["classification"] = 'unknown' 
+        else:
+            output["classification"] = 'unknown'
+
+        all_sources = []
+        if "open_urls" in result:
+            for open_url in result["open_urls"]:
+                clean = self.clean_url(open_url)
+                all_sources.append(clean)
+        output["all_sources"] = all_sources
+        return output
+
+
 
 class OadoiGS(Common):
     def fetch(self):
@@ -140,14 +172,14 @@ class Openaire(Common):
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-oa_class = {'Gold' : 0, 'Green' : 0, 'Unknown' : 0}
+oa_class = {'gold' : 0, 'green' : 0, 'unknown' : 0}
 green_domain = {}
 with open("ucc_scopus_2017_dois.csv") as f:
     for line in f:
         line = line.strip('\n')
         line = line.strip('\r')
         print (line)
-        record = Dissemin(line).parse()
+        record = Oadoi(line).parse()
         if 'classification' in record:
             oa_class[record['classification']] += 1
             if 'all_sources' in record:
@@ -165,12 +197,12 @@ print(green_domain)
 df = pd.DataFrame.from_dict(oa_class, 'index')
 plot = df.plot(kind='bar')
 fig = plot.get_figure()
-fig.savefig("/tmp/output.png")
+fig.savefig("/tmp/output_oadoi.png")
 
 df2 = pd.DataFrame.from_dict(green_domain, 'index')
 plot2 = df2.plot(kind='bar')
 fig2 = plot2.get_figure()
-fig2.savefig("/tmp/output2.png")
+fig2.savefig("/tmp/output_oadoi2.png")
 #        Crossref(line).response()
 #        Dissemin(line).response()
 #        Oadoi(line).response()
