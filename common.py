@@ -61,6 +61,20 @@ class Common(object):
             print("not cached")
             return self.fetch()
 
+    def unique_domains(self, all_sources):
+        domains = []
+        for source in all_sources:
+            try:
+                source_parts = source.split("/")
+            except:
+                source_parts = []
+            if len(source_parts) > 2:
+                domain = source_parts[2]
+                if not domain in domains:
+                    domains.append(domain)
+        return domains
+
+
 class Dissemin(Common):
     def fetch(self):
         r = requests.get("http://dissem.in/api/{0}".format(self.doi))
@@ -96,6 +110,7 @@ class Dissemin(Common):
                 clean = self.clean_url(record['pdf_url'])
                 all_sources.append(clean)
         output["all_sources"] = all_sources
+        output["domains"] = self.unique_domains(all_sources)
         return output
 
 
@@ -138,6 +153,7 @@ class Oadoi(Common):
                 clean = self.clean_url(open_url)
                 all_sources.append(clean)
         output["all_sources"] = all_sources
+        output["domains"] = self.unique_domains(all_sources)
         return output
 
 
@@ -173,36 +189,41 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 oa_class = {'gold' : 0, 'green' : 0, 'unknown' : 0}
-green_domain = {}
-with open("ucc_scopus_2017_dois.csv") as f:
+all_domains = {}
+with open("ucc_all.txt") as f:
     for line in f:
         line = line.strip('\n')
         line = line.strip('\r')
         print (line)
-        record = Oadoi(line).parse()
+        record = Dissemin(line).parse()
         if 'classification' in record:
             oa_class[record['classification']] += 1
-            if 'all_sources' in record:
-                for source in record['all_sources']:
-                    source_parts = source.split("/")
-                    domain = source_parts[2]
-                    if domain in green_domain:
+            if 'domains' in record:
+                for domain in record['domains']:
+                    if domain in all_domains:
                         print("appending domain {0}".format(domain))
-                        green_domain[domain] += 1
+                        all_domains[domain] += 1
                     else:
                         print("creating domain {0}".format(domain))
-                        green_domain[domain] = 1
+                        all_domains[domain] = 1
 print(oa_class)
-print(green_domain)
-df = pd.DataFrame.from_dict(oa_class, 'index')
-plot = df.plot(kind='bar')
+print(all_domains)
+#df = pd.DataFrame.from_dict(oa_class, 'index')
+df = pd.DataFrame(list(oa_class.items()), columns=['classification', 'count'])
+plot = df.plot(kind='bar', x="classification")
 fig = plot.get_figure()
-fig.savefig("/tmp/output_oadoi.png")
+fig.tight_layout()
+fig.savefig("/tmp/output_dissemin.png")
 
-df2 = pd.DataFrame.from_dict(green_domain, 'index')
-plot2 = df2.plot(kind='bar')
+df2 = pd.DataFrame(list(all_domains.items()), columns=['domain', 'count'])
+other = df2.loc[df2['count'] < 30, 'count'].sum()
+print("other: {0}".format(other))
+df2 =  df2.loc[df2['count'] > 30].sort_values('count')
+df2 = df2.append(pd.DataFrame(list({ 'other' : other }.items()), columns=['domain', 'count']))
+plot2 = df2.plot(kind='bar', x='domain')
 fig2 = plot2.get_figure()
-fig2.savefig("/tmp/output_oadoi2.png")
+fig2.tight_layout()
+fig2.savefig("/tmp/output_dissemin2.png")
 #        Crossref(line).response()
 #        Dissemin(line).response()
 #        Oadoi(line).response()
