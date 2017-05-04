@@ -38,8 +38,8 @@ class Common(object):
             if r.status_code == 200:
                 self.cache_response(r.text, handle_cache_file)
                 response = r.json()
-            
-        if response != "":    
+
+        if response != "":
             return response["values"][0]["data"]["value"]
         else:
             return handle
@@ -102,7 +102,7 @@ class Dissemin(Common):
         elif 'pdf_url' in raw['paper']:
             output["classification"] = 'green'
         else:
-            output["classification"] = 'unknown' 
+            output["classification"] = 'unknown'
 
         all_sources = []
         for record in raw['paper']['records']:
@@ -130,7 +130,7 @@ class Oadoi(Common):
         if not 'results' in raw:
             output['classification'] = 'unknown'
             return output
- 
+
         has_open_url = False
         result = raw['results'][0]
         if '_best_open_url' in result and result['_best_open_url'] != None:
@@ -143,7 +143,7 @@ class Oadoi(Common):
             elif has_open_url == True:
                 output["classification"] = "green"
             else:
-                output["classification"] = 'unknown' 
+                output["classification"] = 'unknown'
         else:
             output["classification"] = 'unknown'
 
@@ -184,18 +184,77 @@ class Openaire(Common):
             print(r.status_code)
         return r.text
 
+    def parse(self):
+        output = { 'doi' : self.doi }
+        try:
+            raw = json.loads(self.response())
+        except:
+            return output
+
+        if not 'response' in raw or raw['response']['results'] == None:
+            output['classification'] = 'unknown'
+            return output
+
+        has_open_url = False
+        all_sources = []
+        domains = []
+        # result can be a single node or an array
+        result_array = []
+        if 'result' in raw['response']['results']:
+          if 'metadata' in raw['response']['results']['result']:
+              result_array.append(raw['response']['results']['result'])
+          elif len(raw['response']['results']['result']) > 1:
+              result_array = raw['response']['results']['result']
+
+          for result in result_array:
+              children = result['metadata']['oaf:entity']['oaf:result']['children']
+              print(result['metadata']['oaf:entity']['oaf:result']['children'])
+              if 'instance' in children:
+                  # instance can either be an instance node or an array of instance nodes
+                  instance_array = []
+                  if '@id' in children["instance"]:
+                      instance_array.append(children["instance"])
+                  elif len(children["instance"]) > 0:
+                      instance_array = children["instance"]
+
+                  for node in instance_array:
+                      if node['licence']['@classid'] == "OPEN":
+                          has_open_url = True
+                          # webresource can be a single node or an array of node
+                          webresource_array = []
+                          if 'webresource' in node:
+                              if 'url' in node['webresource']:
+                                  webresource_array.append(node['webresource'])
+                              elif len(node['webresource']) > 0:
+                                  webresource_array = node['webresource']
+
+                              for resource in webresource_array:
+                                  open_url = resource['url']['$']
+                                  clean = self.clean_url(open_url)
+                                  all_sources.append(clean)
+        output["all_sources"] = all_sources
+        output["domains"] = self.unique_domains(all_sources)
+        if has_open_url == True:
+            output['classification'] = 'green'
+            if len(all_sources) > 0 :
+                output["pref_pdf_url"] = all_sources[0]
+        return output
+
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 oa_class = {'gold' : 0, 'green' : 0, 'unknown' : 0}
 all_domains = {}
-with open("ucc_all.txt") as f:
+with open("ucc_scopus_2017_dois.csv") as f:
+#with open("dummy.txt") as f:
     for line in f:
         line = line.strip('\n')
         line = line.strip('\r')
         print (line)
-        record = Dissemin(line).parse()
+
+        record = Openaire(line).parse()
+        #record = {}
         if 'classification' in record:
             oa_class[record['classification']] += 1
             if 'domains' in record:
@@ -213,7 +272,7 @@ df = pd.DataFrame(list(oa_class.items()), columns=['classification', 'count'])
 plot = df.plot(kind='bar', x="classification")
 fig = plot.get_figure()
 fig.tight_layout()
-fig.savefig("/tmp/output_dissemin.png")
+fig.savefig("/tmp/output_openaire.png")
 
 df2 = pd.DataFrame(list(all_domains.items()), columns=['domain', 'count'])
 other = df2.loc[df2['count'] < 30, 'count'].sum()
@@ -223,7 +282,7 @@ df2 = df2.append(pd.DataFrame(list({ 'other' : other }.items()), columns=['domai
 plot2 = df2.plot(kind='bar', x='domain')
 fig2 = plot2.get_figure()
 fig2.tight_layout()
-fig2.savefig("/tmp/output_dissemin2.png")
+fig2.savefig("/tmp/output_openaire2.png")
 #        Crossref(line).response()
 #        Dissemin(line).response()
 #        Oadoi(line).response()
@@ -233,17 +292,18 @@ fig2.savefig("/tmp/output_dissemin2.png")
 doi = "10.1038/nature12873"
 
 #doi = "10.1016/j.tetasy.2010.05.004"
-d = Dissemin(doi)
-d.response()
-print("blah")
-print(d.parse())
-print("blah")
+print(doi)
+#d = Dissemin(doi)
+#d.response()
+#print("blah")
+#print(d.parse())
+#print("blah")
 
-oadoi = Oadoi(doi)
-oadoi.response()
+#oadoi = Oadoi(doi)
+#oadoi.response()
 
-oadoigs = OadoiGS(doi)
-oadoigs.response()
+#oadoigs = OadoiGS(doi)
+#oadoigs.response()
 
 openaire = Openaire(doi)
-openaire.response()
+print(openaire.parse())
