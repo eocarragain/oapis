@@ -23,9 +23,10 @@ class Common(object):
     def handle_lookup(self, handle):
         #return handle
         #todo verify handle format with regex
+        handle_prefix = handle[:handle.rfind('/')].replace("https", "http") 
         handle_cache_dir = "{0}/handle".format(self.base_cache)
         os.makedirs(handle_cache_dir, exist_ok=True)
-        handle_digest = hashlib.md5(handle.encode('utf-8')).hexdigest()
+        handle_digest = hashlib.md5(handle_prefix.encode('utf-8')).hexdigest()
         handle_cache_file = os.path.join(handle_cache_dir, handle_digest + ".json")
         response = ""
         if os.path.isfile(handle_cache_file):
