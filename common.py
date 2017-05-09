@@ -52,15 +52,18 @@ class Common(object):
         return url
 
     def fetch(self):
-        return ""
+        return "{}"
 
-    def response(self):
-        if os.path.isfile(self.cache_file):
+    def response(self, cache_mode="fill"):
+        if os.path.isfile(self.cache_file) and cache_mode != "overwrite":
             print("cached")
             return open(self.cache_file, 'r').read()
         else:
-            print("not cached")
-            return self.fetch()
+            if cache_mode != "cache_only":
+                print("not cached")
+                return self.fetch()
+            else:
+                return "{}"
 
     def unique_domains(self, all_sources):
         domains = []
@@ -88,9 +91,9 @@ class Dissemin(Common):
 
         return r.text
 
-    def parse(self):
+    def parse(self, cache_mode="fill"):
         output = { 'doi' : self.doi }
-        raw = json.loads(self.response())
+        raw = json.loads(self.response(cache_mode))
         if not 'paper' in raw:
             output['classification'] = 'unknown'
             return output
@@ -125,9 +128,9 @@ class Oadoi(Common):
 
         return r.text
 
-    def parse(self):
+    def parse(self, cache_mode="fill"):
         output = { 'doi' : self.doi }
-        raw = json.loads(self.response())
+        raw = json.loads(self.response(cache_mode))
         if not 'results' in raw:
             output['classification'] = 'unknown'
             return output
@@ -185,10 +188,10 @@ class Openaire(Common):
             print(r.status_code)
         return r.text
 
-    def parse(self):
+    def parse(self, cache_mode="fill"):
         output = { 'doi' : self.doi }
         try:
-            raw = json.loads(self.response())
+            raw = json.loads(self.response(cache_mode))
         except:
             return output
 
@@ -237,7 +240,7 @@ class Openaire(Common):
         output["domains"] = self.unique_domains(all_sources)
         if has_open_url == True:
             output['classification'] = 'green'
-            if len(all_sources) > 0 :
+            if len(all_sources) > 0:
                 output["pref_pdf_url"] = all_sources[0]
         return output
 
@@ -247,14 +250,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 oa_class = {'gold' : 0, 'green' : 0, 'unknown' : 0}
 all_domains = {}
-with open("ucc_scopus_2017_dois.csv") as f:
+with open("/media/sf_vm-shared-folder/scopus_exports/DOIs/ucc.txt") as f:
 #with open("dummy.txt") as f:
     for line in f:
         line = line.strip('\n')
         line = line.strip('\r')
         print (line)
 
-        record = Openaire(line).parse()
+        record = Oadoi(line).parse("cache_only")
         #record = {}
         if 'classification' in record:
             oa_class[record['classification']] += 1
@@ -273,7 +276,7 @@ df = pd.DataFrame(list(oa_class.items()), columns=['classification', 'count'])
 plot = df.plot(kind='bar', x="classification")
 fig = plot.get_figure()
 fig.tight_layout()
-fig.savefig("/tmp/output_openaire.png")
+fig.savefig("/tmp/output_ucc_oadoi.png")
 
 df2 = pd.DataFrame(list(all_domains.items()), columns=['domain', 'count'])
 other = df2.loc[df2['count'] < 30, 'count'].sum()
@@ -283,17 +286,17 @@ df2 = df2.append(pd.DataFrame(list({ 'other' : other }.items()), columns=['domai
 plot2 = df2.plot(kind='bar', x='domain')
 fig2 = plot2.get_figure()
 fig2.tight_layout()
-fig2.savefig("/tmp/output_openaire2.png")
+fig2.savefig("/tmp/output_ucc_oadoi2.png")
 #        Crossref(line).response()
 #        Dissemin(line).response()
 #        Oadoi(line).response()
         #OadoiGS(line).response()
 #        Openaire(line).response()
 
-doi = "10.1038/nature12873"
+#doi = "10.1038/nature12873"
 
 #doi = "10.1016/j.tetasy.2010.05.004"
-print(doi)
+#print(doi)
 #d = Dissemin(doi)
 #d.response()
 #print("blah")
@@ -306,5 +309,13 @@ print(doi)
 #oadoigs = OadoiGS(doi)
 #oadoigs.response()
 
-openaire = Openaire(doi)
-print(openaire.parse())
+#openaire = Openaire(doi)
+#print(openaire.parse())
+'''with open("/media/sf_vm-shared-folder/scopus_exports/DOIs/affilcountry_ie_remainder.txt") as f:
+    for line in f:
+        print(line)
+        Crossref(line).response()
+        Dissemin(line).response()
+        Oadoi(line).response()
+
+'''
