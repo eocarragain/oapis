@@ -244,13 +244,23 @@ class Openaire(Common):
                 output["pref_pdf_url"] = all_sources[0]
         return output
 
+class RecordSet(object):
+    def __init__(self, input_file, output_file, cache_mode='fill'):
+        self.input_file = input_file
+        self.output_file = output_file
+        self.cache_mode = cache_mode
+        self.oa_class_counts = {'gold' : 0, 'green' : 0, 'unknown' : 0}
+        self.domain_counts = {}
+
+
+    def build_summary(self)
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 oa_class = {'gold' : 0, 'green' : 0, 'unknown' : 0}
 all_domains = {}
-with open("/media/sf_vm-shared-folder/scopus_exports/DOIs/ucc.txt") as f:
+with open("test.txt") as f:
 #with open("dummy.txt") as f:
     for line in f:
         line = line.strip('\n')
@@ -269,8 +279,31 @@ with open("/media/sf_vm-shared-folder/scopus_exports/DOIs/ucc.txt") as f:
                     else:
                         print("creating domain {0}".format(domain))
                         all_domains[domain] = 1
+
 print(oa_class)
 print(all_domains)
+
+print(oa_class.items())
+print(list(oa_class.items()))
+print(list(oa_class.items()))
+
+from altair import *
+df = pd.DataFrame([row + ('oadoi',) for row in list(oa_class.items())], columns=['classification', 'count', 'api'])
+print(df)
+chart = Chart(df).mark_bar(stacked='normalize',).encode(
+    color='classification:N',
+    x='sum(count):Q',
+    y='api:N',
+)
+
+print(chart.to_json())
+file = open('stacked_cats_by_api.html', 'w')
+file.write(chart.to_html())
+file.close
+
+
+
+'''
 #df = pd.DataFrame.from_dict(oa_class, 'index')
 df = pd.DataFrame(list(oa_class.items()), columns=['classification', 'count'])
 plot = df.plot(kind='bar', x="classification")
@@ -286,7 +319,7 @@ df2 = df2.append(pd.DataFrame(list({ 'other' : other }.items()), columns=['domai
 plot2 = df2.plot(kind='bar', x='domain')
 fig2 = plot2.get_figure()
 fig2.tight_layout()
-fig2.savefig("/tmp/output_ucc_oadoi2.png")
+fig2.savefig("/tmp/output_ucc_oadoi2.png")'''
 #        Crossref(line).response()
 #        Dissemin(line).response()
 #        Oadoi(line).response()
