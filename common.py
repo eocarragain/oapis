@@ -2,6 +2,7 @@ import requests
 import hashlib
 import os
 import json
+import string
 
 class Common(object):
     def __init__(self, doi):
@@ -179,6 +180,75 @@ class Crossref(Common):
 
         return r.text
 
+    def parse(self):
+        # todo
+
+    def get_title(self):
+        # convenience method
+
+    def get_year(self):
+        # convenience method
+
+class MSAcademic(Common):
+    def __init__(self, doi):
+        super().__init__(doi)
+        self.key = # lookup from config
+        self.title = self.get_title
+
+    def get_title(self):
+        title = # fetch from crossref
+        # clean
+        title = title.lower().translate(title.maketrans('','',string.punctuation))
+        title = title.replace("  ", " ")
+        return title
+
+    def fetch(self):
+        expr_param = "Ti=='{0}'".format(self.title)
+        payload = {'expr' : expr_param, 'attributes' : 'Id,Ti,E', }
+        headers = {'Ocp-Apim-Subscription-Key' : self.key}
+        r = requests.get("https://westus.api.cognitive.microsoft.com/academic/v1.0/evaluate", headers=headers, params=payload)
+        if r.status_code == 200:
+            self.cache_response(r.text, self.cache_file)
+
+        return r.text
+
+    def parse(self, cache_mode="fill"):
+        output = { 'doi' : self.doi }
+        try:
+            raw = json.loads(self.response(cache_mode))
+        except:
+            return output
+
+        if not 'entities' in raw or raw['entities'] == []:
+            output['classification'] = 'unknown'
+            return output
+
+        has_open_url = False
+        all_sources = []
+        domains = []
+
+        for entity in entities:
+            if 'E' in entity:
+                json = json.loads(entity['E'])
+                if 'DOI' in json and json['DOI'] == self.doi:
+                    if 'S' in json:
+                        for source in json['S']:
+                            # only take pdfs for now
+                            if source['Ty'] == 3:
+                                has_open_url = True
+                                clean = self.clean_url(open_url)
+                                all_sources.append(clean)
+                else:
+                    print("result doesn't match DOI. Skipping")
+
+        output["all_sources"] = all_sources
+        output["domains"] = self.unique_domains(all_sources)
+        if has_open_url == True:
+            output['classification'] = 'green'
+            if len(all_sources) > 0:
+                output["pref_pdf_url"] = all_sources[0]
+        return output
+
 class Openaire(Common):
     def fetch(self):
         r = requests.get("http://api.openaire.eu/search/publications?doi={0}&format=json".format(self.doi))
@@ -194,7 +264,7 @@ class Openaire(Common):
             raw = json.loads(self.response(cache_mode))
         except:
             return output
-
+        
         if not 'response' in raw or raw['response']['results'] == None:
             output['classification'] = 'unknown'
             return output
@@ -244,7 +314,7 @@ class Openaire(Common):
                 output["pref_pdf_url"] = all_sources[0]
         return output
 
-
+'''
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -286,7 +356,7 @@ df2 = df2.append(pd.DataFrame(list({ 'other' : other }.items()), columns=['domai
 plot2 = df2.plot(kind='bar', x='domain')
 fig2 = plot2.get_figure()
 fig2.tight_layout()
-fig2.savefig("/tmp/output_ucc_oadoi2.png")
+fig2.savefig("/tmp/output_ucc_oadoi2.png")'''
 #        Crossref(line).response()
 #        Dissemin(line).response()
 #        Oadoi(line).response()
@@ -317,5 +387,7 @@ fig2.savefig("/tmp/output_ucc_oadoi2.png")
         Crossref(line).response()
         Dissemin(line).response()
         Oadoi(line).response()
-
 '''
+
+#ms = MSAcademic('blah', '88898ecc8c844a1fbafcc7cc454dcca0').response()
+#print(ms)
