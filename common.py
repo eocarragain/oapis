@@ -3,6 +3,7 @@ import hashlib
 import os
 import json
 import string
+import time
 
 class Common(object):
     def __init__(self, doi):
@@ -172,6 +173,42 @@ class OadoiGS(Common):
 
         return r.text
 
+class Core(Common):
+    def __init__(self, doi):
+        super().__init__(doi)
+        self.key = ''# lookup from config
+
+    def fetch(self):
+        url = "https://core.ac.uk/api-v2/articles/search/doi:%22{0}%22?urls=true&apiKey={1}".format(self.doi, self.key)
+        r = requests.get(url)
+        if r.status_code == 200:
+            self.cache_response(r.text, self.cache_file)
+
+        return r.text
+
+    def parse(self, cache_mode="fill"):
+        output = { 'doi' : self.doi }
+        raw = json.loads(self.response(cache_mode))
+        if not 'status' in raw or raw['status'] != 'OK':
+            output['classification'] = 'unknown'
+            return output
+
+        has_open_url = False
+        for result in raw['data']:
+            if 'fulltextIdentifier' in result and result['fulltextIdentifier'] != None:
+                output["pref_pdf_url"] = result['fulltextIdentifier']
+                output["classification"] = "green"
+                has_open_url = True          
+
+            all_sources = []
+            if "fulltextUrls" in result and result['fulltextUrls'] != None:
+                for open_url in result["fulltextUrls"]:
+                    clean = self.clean_url(open_url)
+                    all_sources.append(clean)
+            output["all_sources"] = all_sources
+            output["domains"] = self.unique_domains(all_sources)
+            return output
+
 class Crossref(Common):
     def fetch(self):
         r = requests.get("https://api.crossref.org/works/{0}".format(self.doi))
@@ -182,21 +219,24 @@ class Crossref(Common):
 
     def parse(self):
         # todo
+        return ""
 
     def get_title(self):
         # convenience method
+        return ""
 
     def get_year(self):
         # convenience method
+        return ""
 
 class MSAcademic(Common):
     def __init__(self, doi):
         super().__init__(doi)
-        self.key = # lookup from config
+        self.key = ''# lookup from config
         self.title = self.get_title
 
     def get_title(self):
-        title = # fetch from crossref
+        title = ''# fetch from crossref
         # clean
         title = title.lower().translate(title.maketrans('','',string.punctuation))
         title = title.replace("  ", " ")
@@ -381,13 +421,19 @@ fig2.savefig("/tmp/output_ucc_oadoi2.png")'''
 
 #openaire = Openaire(doi)
 #print(openaire.parse())
-'''with open("/media/sf_vm-shared-folder/scopus_exports/DOIs/affilcountry_ie_remainder.txt") as f:
+
+#Core("10.1016/j.tetasy.2010.05.004d").response()
+
+with open("/home/laptopia/dev/scopus_exports/DOIs/affilcountry_ie_remainder.txt") as f:
     for line in f:
+        line = line.strip('\n')
+        line = line.strip('\r')
         print(line)
-        Crossref(line).response()
-        Dissemin(line).response()
-        Oadoi(line).response()
-'''
+        print(Core(line).parse())
+        time.sleep(0.75)
+        #Dissemin(line).response()
+        #Oadoi(line).response()
+
 
 #ms = MSAcademic('blah', '88898ecc8c844a1fbafcc7cc454dcca0').response()
 #print(ms)
