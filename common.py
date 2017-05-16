@@ -177,6 +177,7 @@ class Core(Common):
     def __init__(self, doi):
         super().__init__(doi)
         self.key = ''# lookup from config
+        self.key = ''# lookup from config
 
     def fetch(self):
         url = "https://core.ac.uk/api-v2/articles/search/doi:%22{0}%22?urls=true&apiKey={1}".format(self.doi, self.key)
@@ -193,21 +194,55 @@ class Core(Common):
             output['classification'] = 'unknown'
             return output
 
+        all_sources = []
         has_open_url = False
         for result in raw['data']:
             if 'fulltextIdentifier' in result and result['fulltextIdentifier'] != None:
                 output["pref_pdf_url"] = result['fulltextIdentifier']
-                output["classification"] = "green"
-                has_open_url = True          
+                output["classification"] = "open"     
 
-            all_sources = []
             if "fulltextUrls" in result and result['fulltextUrls'] != None:
                 for open_url in result["fulltextUrls"]:
                     clean = self.clean_url(open_url)
                     all_sources.append(clean)
-            output["all_sources"] = all_sources
-            output["domains"] = self.unique_domains(all_sources)
+        output["all_sources"] = all_sources
+        output["domains"] = self.unique_domains(all_sources)
+        return output
+
+class OAButton(Common):
+    def fetch(self):
+        r = requests.get("https://api.openaccessbutton.org/availability?doi={0}".format(self.doi))
+        if r.status_code == 200:
+            self.cache_response(r.text, self.cache_file)
+        elif r.status_code == 500:
+            return '{"status": "failed"}'
+        return r.text
+
+    def parse(self, cache_mode="fill"):
+        output = { 'doi' : self.doi }
+        raw = json.loads(self.response(cache_mode))
+        if not 'status' in raw or raw['status'] != 'success':
+            output['classification'] = 'unknown'
             return output
+
+        all_sources = []
+        has_open_url = False
+        for result in raw['data']['availability']:
+            if 'type' in result and result['type'] == 'article':
+                has_open_url = True
+                open_url = result['url']
+                clean = self.clean_url(open_url)
+                all_sources.append(clean)
+
+        output["all_sources"] = all_sources
+        output["domains"] = self.unique_domains(all_sources)
+        if has_open_url == True:
+            output["classification"] = "open"
+            if len(all_sources) > 0:
+                output["pref_pdf_url"] = all_sources[0]
+        else:
+            output["classification"] = "unknown"
+        return output
 
 class Crossref(Common):
     def fetch(self):
@@ -358,7 +393,7 @@ class Openaire(Common):
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-oa_class = {'gold' : 0, 'green' : 0, 'unknown' : 0}
+oa_class = {'gold' : 0, 'green' : 0, 'unknown' : 0, 'open' : 0}
 all_domains = {}
 with open("/media/sf_vm-shared-folder/scopus_exports/DOIs/ucc.txt") as f:
 #with open("dummy.txt") as f:
