@@ -7,12 +7,18 @@ import time
 
 class Common(object):
     def __init__(self, doi):
-        self.doi = doi
+        self.doi = self.clean_doi(doi)
         self.base_cache = "./cache"
         self.cache_dir = "{0}/{1}".format(self.base_cache, self.__class__.__name__.lower())
         self.create_cache_dir()
         doi_digest = hashlib.md5(self.doi.encode('utf-8')).hexdigest()
         self.cache_file = os.path.join(self.cache_dir, doi_digest + ".json")
+
+    def clean_doi(self, doi):
+        doi = doi.strip('\n')
+        doi = doi.strip('\r')
+        doi = doi.strip()
+        return doi
 
     def create_cache_dir(self):
         os.makedirs(self.cache_dir, exist_ok=True)
@@ -176,7 +182,6 @@ class OadoiGS(Common):
 class Core(Common):
     def __init__(self, doi):
         super().__init__(doi)
-        self.key = ''# lookup from config
         self.key = ''# lookup from config
 
     def fetch(self):
@@ -461,8 +466,8 @@ fig2.savefig("/tmp/output_ucc_oadoi2.png")'''
 
 with open("/home/laptopia/dev/scopus_exports/DOIs/affilcountry_ie_remainder.txt") as f:
     for line in f:
-        line = line.strip('\n')
-        line = line.strip('\r')
+       # line = line.strip('\n')
+       # line = line.strip('\r')
         print(line)
         print(Core(line).parse())
         time.sleep(0.75)
