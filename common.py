@@ -90,11 +90,15 @@ class Common(object):
 class Dissemin(Common):
     def fetch(self):
         r = requests.get("http://dissem.in/api/{0}".format(self.doi))
+        # if we get an initial 404, try the older dissemin api
         if r.status_code == 404:
             payload = '{{"doi" : "{0}"}}'.format(self.doi)
             r = requests.post('http://dissem.in/api/query', data = payload)
 
-        if r.status_code == 200:
+        # cache on success or on second 404 
+        # this is more consistent with other apis where 
+        # null response is still cached
+        if r.status_code == 200 or r.status_code == 404:
            self.cache_response(r.text, self.cache_file)
 
         return r.text
