@@ -164,8 +164,8 @@ class Oadoi(Common):
             output["classification"] = 'unknown'
 
         all_sources = []
-        if "open_urls" in result:
-            for open_url in result["open_urls"]:
+        if "_open_urls" in result:
+            for open_url in result["_open_urls"]:
                 clean = self.clean_url(open_url)
                 all_sources.append(clean)
         output["all_sources"] = all_sources
@@ -467,7 +467,7 @@ fig2.savefig("/tmp/output_ucc_oadoi2.png")'''
 #print(openaire.parse())
 
 #Core("10.1016/j.tetasy.2010.05.004d").response()
-
+'''
 with open("/home/laptopia/dev/scopus_exports/DOIs/affilcountry_ie_remainder.txt") as f:
     for line in f:
        # line = line.strip('\n')
@@ -480,4 +480,4 @@ with open("/home/laptopia/dev/scopus_exports/DOIs/affilcountry_ie_remainder.txt"
 
 
 #ms = MSAcademic('blah', '88898ecc8c844a1fbafcc7cc454dcca0').response()
-#print(ms)
+#print(ms)'''
