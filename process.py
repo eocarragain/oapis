@@ -1,5 +1,6 @@
 import common
-
+import pandas as pd
+from altair import *
 '''
 import pandas as pd
 import numpy as np
@@ -65,3 +66,36 @@ print(d.parse())
 
 oadoi = common.Oadoi(doi)
 print(oadoi.parse())
+
+classification_by_api = []
+
+with open("test.txt") as f:
+    for line in f:
+        line = line.strip('\n')
+        line = line.strip('\r')
+        line = line.strip()
+        print(line)
+        record = common.Dissemin(line).parse()
+        classification_by_api.append({"api":"dissemin", "class": record['classification'], "doi": line})
+
+        record = common.Oadoi(line).parse()
+        classification_by_api.append({"api":"oadoi", "class": record['classification'], "doi": line})
+
+        record = common.Openaire(line).parse()
+        classification_by_api.append({"api":"openaire", "class": record['classification'], "doi": line})
+
+        record = common.OAButton(line).parse()
+        classification_by_api.append({"api":"oabutton", "class": record['classification'], "doi": line})
+
+df = pd.DataFrame(classification_by_api)
+print(df)
+chart = Chart(df).mark_bar(stacked='normalize',).encode(
+    color='class:N',
+    x='count(*):Q',
+    y='api:N',
+)
+
+print(chart.to_json())
+file = open('class_by_api_stacked.html', 'w')
+file.write(chart.to_html())
+file.close
