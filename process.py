@@ -1,6 +1,8 @@
 import common
 import pandas as pd
 from altair import *
+import random
+import csv
 '''
 import pandas as pd
 import numpy as np
@@ -69,23 +71,34 @@ print(oadoi.parse())
 
 classification_by_api = []
 
-with open("test.txt") as f:
-    for line in f:
-        line = line.strip('\n')
-        line = line.strip('\r')
-        line = line.strip()
-        print(line)
-        record = common.Dissemin(line).parse()
-        classification_by_api.append({"api":"dissemin", "class": record['classification'], "doi": line})
+inst_var = "ucc"
+csv_file = "../scopus_exports/{}.csv".format(inst_var)
 
-        record = common.Oadoi(line).parse()
-        classification_by_api.append({"api":"oadoi", "class": record['classification'], "doi": line})
+with open(csv_file, 'r', encoding='utf-8', errors='ignore') as csvfile:
+    reader = csv.DictReader(csvfile)
 
-        record = common.Openaire(line).parse()
-        classification_by_api.append({"api":"openaire", "class": record['classification'], "doi": line})
+    for row in reader:
+        doi = row['DOI']
+        year = row['Year']
 
-        record = common.OAButton(line).parse()
-        classification_by_api.append({"api":"oabutton", "class": record['classification'], "doi": line})
+        doi = doi.strip('\n')
+        doi = doi.strip('\r')
+        doi = doi.strip()
+        if doi == "":
+            print("skipping empty doi")
+            continue
+        print(doi)
+        record = common.Dissemin(doi).parse("cache_only")
+        classification_by_api.append({"api":"dissemin", "class": record['classification'], "doi": doi, "year": year})
+
+        record = common.Oadoi(doi).parse("cache_only")
+        classification_by_api.append({"api":"oadoi", "class": record['classification'], "doi": doi, "year": year})
+
+        #record = common.Openaire(line).parse()
+        #classification_by_api.append({"api":"openaire", "class": record['classification'], "doi": line})
+
+        #record = common.OAButton(line).parse()
+        #classification_by_api.append({"api":"oabutton", "class": record['classification'], "doi": line})
 
 df = pd.DataFrame(classification_by_api)
 print(df)
@@ -96,6 +109,37 @@ chart = Chart(df).mark_bar(stacked='normalize',).encode(
 )
 
 print(chart.to_json())
-file = open('class_by_api_stacked.html', 'w')
+file = open("class_by_api_stacked_{0}.html".format(inst_var), 'w')
+file.write(chart.to_html())
+file.close
+
+
+
+
+chart = Chart(df).mark_area(
+    stacked='normalize',
+).encode(
+    color=Color('class:N'),
+    x=X('year:T'),
+    y=Y('count(*):Q',
+        axis=False,
+    ),
+).configure_cell(
+    height=200.0,
+    width=300.0,
+)
+
+
+file = open("class_by_year_stacked_area_{0}.html".format(inst_var), 'w')
+file.write(chart.to_html())
+file.close
+
+chart = Chart(df).mark_line().encode(
+    color='class:N',
+    x='year:T',
+    y='count(*):Q',
+)
+
+file = open("class_by_year_multi_line_{0}.html".format(inst_var), 'w')
 file.write(chart.to_html())
 file.close
