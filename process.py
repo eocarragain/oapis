@@ -70,9 +70,9 @@ oadoi = common.Oadoi(doi)
 print(oadoi.parse())
 
 classification_by_api = []
+domain_by_api = []
 
-inst_var = "ucc"
-csv_file = "../scopus_exports/{}.csv".format(inst_var)
+csv_file = "../scopus_exports/combined_csv/combined_test.csv"
 
 with open(csv_file, 'r', encoding='utf-8', errors='ignore') as csvfile:
     reader = csv.DictReader(csvfile)
@@ -80,19 +80,24 @@ with open(csv_file, 'r', encoding='utf-8', errors='ignore') as csvfile:
     for row in reader:
         doi = row['DOI']
         year = row['Year']
-
-        doi = doi.strip('\n')
-        doi = doi.strip('\r')
-        doi = doi.strip()
-        if doi == "":
-            print("skipping empty doi")
-            continue
+        affiliation = row['Affiliation']
         print(doi)
-        record = common.Dissemin(doi).parse("cache_only")
-        classification_by_api.append({"api":"dissemin", "class": record['classification'], "doi": doi, "year": year})
+        record = common.Dissemin(doi).parse()
+        classification_by_api.append({"api":"dissemin", "class": record['classification'], "affiliation": affiliation, "year": year}) 
+        is_pref_url = False
+        for domain in record['domains']:
+            if domain == record['pref_pdf_url']:
+                is_pref_url = True
+            domain_by_api.append({"api":"dissemin", "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
 
-        record = common.Oadoi(doi).parse("cache_only")
-        classification_by_api.append({"api":"oadoi", "class": record['classification'], "doi": doi, "year": year})
+        record = common.Oadoi(doi).parse()
+        classification_by_api.append({"api":"oadoi", "class": record['classification'], "affiliation": affiliation, "year": year})
+        is_pref_url = False
+        for domain in record['domains']:
+            if domain == record['pref_pdf_url']:
+                is_pref_url = True
+            domain_by_api.append({"api":"oadoi", "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
+
 
         #record = common.Openaire(line).parse()
         #classification_by_api.append({"api":"openaire", "class": record['classification'], "doi": line})
@@ -103,23 +108,33 @@ with open(csv_file, 'r', encoding='utf-8', errors='ignore') as csvfile:
 df = pd.DataFrame(classification_by_api)
 print(df)
 chart = Chart(df).mark_bar(stacked='normalize',).encode(
-    color='class:N',
+    color=Color('class:N',
+        scale=Scale(
+            domain=["gold", "green", "unknown"], 
+            range=['#FFD700', '00f64f','#000000'],
+        ),
+    ),
+    column='affiliation:O',
     x='count(*):Q',
     y='api:N',
 )
 
 print(chart.to_json())
-file = open("class_by_api_stacked_{0}.html".format(inst_var), 'w')
-file.write(chart.to_html())
+file = open("../scopus_exports/html/class_by_api_stacked_bar_trellis.html", 'w')
+file.write(chart.to_json())
 file.close
-
-
 
 
 chart = Chart(df).mark_area(
     stacked='normalize',
 ).encode(
-    color=Color('class:N'),
+    color=Color('class:N',
+        scale=Scale(
+            domain=["gold", "green", "unknown"], 
+            range=['#FFD700', '00f64f','#000000'],
+        ),
+    ),
+    column='affiliation:O',
     x=X('year:T'),
     y=Y('count(*):Q',
         axis=False,
@@ -130,16 +145,70 @@ chart = Chart(df).mark_area(
 )
 
 
-file = open("class_by_year_stacked_area_{0}.html".format(inst_var), 'w')
-file.write(chart.to_html())
+
+file = open("../scopus_exports/html/class_by_year_stacked_area_trellis.html", 'w')
+file.write(chart.to_json())
 file.close
 
 chart = Chart(df).mark_line().encode(
-    color='class:N',
+    color=Color('class:N',
+        scale=Scale(
+            domain=["gold", "green", "unknown"], 
+            range=['#FFD700', '00f64f','#000000'],
+        ),
+    ),
+    column='affiliation:O',
     x='year:T',
     y='count(*):Q',
 )
 
-file = open("class_by_year_multi_line_{0}.html".format(inst_var), 'w')
-file.write(chart.to_html())
+file = open("../scopus_exports/html/class_by_year_multi_line_trellis.html", 'w')
+file.write(chart.to_json())
+file.close
+
+
+# api by year multi-line
+chart = Chart(df).mark_line().encode(
+    color=Color('class:N',
+        scale=Scale(
+            domain=["gold", "green", "unknown"], 
+            range=['#FFD700', '00f64f','#000000'],
+        ),
+    ),
+    column='api:O',
+    x='year:T',
+    y='count(*):Q',
+)
+
+file = open("../scopus_exports/html/class_by_year_by_api_multi_line_trellis.html", 'w')
+file.write(chart.to_json())
+file.close
+
+df_domain = pd.DataFrame(domain_by_api)
+chart = Chart(df_domain).mark_bar(stacked='normalize',).encode(
+    color=Color('class:N',
+        scale=Scale(
+            domain=["gold", "green", "unknown"], 
+            range=['#FFD700', '00f64f','#000000'],
+        ),
+    ),
+    column='api:O',
+    x='count(*):Q',
+    y='domain:N',
+)
+
+print(chart.to_json())
+file = open("../scopus_exports/html/domain_by_api_stacked_bar_trellis.html", 'w')
+file.write(chart.to_json())
+file.close
+
+chart = Chart(df_domain).mark_bar().encode(
+    column='api:O',
+    x='domain:N',
+    y='count(*):Q',
+)
+
+print(chart.to_json())
+file = open("../scopus_exports/html/domain_by_api_bar_trellis.html", 'w')
+file.write(chart.to_json())
 file.close
