@@ -111,9 +111,9 @@ df = pd.DataFrame(classification_by_api)
 
 
 df_filter = df[df['year'] >= year_filter]
-print(df_filter)
+#print(df_filter)
 df_process = df_filter[['api', 'class', 'affiliation']].groupby(['api', 'class', 'affiliation']).size().to_frame("count").reset_index()
-print(df_process)
+#print(df_process)
 
 chart = Chart(df_process).mark_bar(stacked='normalize',).encode(
     color=Color('class:N',
@@ -218,21 +218,27 @@ file.close
 
 
 # Bar chart of top domains; trellised by api
+def domain_by_api_bar_trellis(df_domain, suffix="all_affiliations"):
+    df_domain_group = df_domain[['api', 'domain']].groupby(['api', 'domain']).size().to_frame("count").reset_index()
+    df_filtered = pd.DataFrame()
+
+    for api in df_domain_group.api.unique():
+        df_api = df_domain_group[df_domain_group['api'] == api].sort_values('count', ascending=False)
+        df_api = df_api[0:5].append(pd.DataFrame({"api": [api], "domain": ['other'], "count": [df_api[6:].sum()[2]]}))
+        df_filtered = df_filtered.append(df_api, ignore_index=True)
+
+    chart = Chart(df_filtered).mark_bar().encode(
+        column='api:O',
+        x='domain:N',
+        y='count:Q',
+    )
+
+    file = open("../scopus_exports/html/domain_by_api_bar_trellis_{0}.html".format(suffix), 'w')
+    file.write(chart.to_html())
+    file.close
+
 df_domain = pd.DataFrame(domain_by_api)
-df_domain_group = df_domain[['api', 'domain']].groupby(['api', 'domain']).size().to_frame("count").reset_index()
-df_filtered = pd.DataFrame()
-
-for api in df_domain_group.api.unique():
-    df_api = df_domain_group[df_domain_group['api'] == api].sort_values('count', ascending=False)
-    df_api = df_api[0:5].append(pd.DataFrame({"api": [api], "domain": ['other'], "count": [df_api[6:].sum()[2]]}))
-    df_filtered = df_filtered.append(df_api, ignore_index=True)
-
-chart = Chart(df_filtered).mark_bar().encode(
-    column='api:O',
-    x='domain:N',
-    y='count:Q',
-)
-
-file = open("../scopus_exports/html/domain_by_api_bar_trellis.html", 'w')
-file.write(chart.to_html())
-file.close
+domain_by_api_bar_trellis(df_domain)
+for affiliation in df_domain.affiliation.unique():    
+    filtered = df_domain[df_domain['affiliation'] == affiliation]
+    domain_by_api_bar_trellis(filtered, affiliation)
