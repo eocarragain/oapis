@@ -98,6 +98,22 @@ with open(csv_file, 'r', encoding='utf-8', errors='ignore') as csvfile:
                 is_pref_url = True
             domain_by_api.append({"api":"oadoi", "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
 
+        record = common.OAButton(doi).parse()
+        classification_by_api.append({"api":"oabutton", "class": record['classification'], "affiliation": affiliation, "year": year}) 
+        is_pref_url = False
+        for domain in record['domains']:
+            if domain == record['pref_pdf_url']:
+                is_pref_url = True
+            domain_by_api.append({"api":"oabutton", "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
+
+        record = common.Core(doi).parse()
+        classification_by_api.append({"api":"core", "class": record['classification'], "affiliation": affiliation, "year": year})
+        is_pref_url = False
+        for domain in record['domains']:
+            if domain == record['pref_pdf_url']:
+                is_pref_url = True
+            domain_by_api.append({"api":"core", "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
+
 
         #record = common.Openaire(line).parse()
         #classification_by_api.append({"api":"openaire", "class": record['classification'], "doi": line})
@@ -133,8 +149,37 @@ file.close
 
 
 # Stacked area-chart showing classification by year, trellised by affiliation
-df_process = df_filter[['class', 'year', 'affiliation']].groupby(['class', 'year', 'affiliation']).size().to_frame("count").reset_index()
+def class_by_year_stacked_area_trellis(df_filter,suffix="all_apis"):
+    df_process = df_filter[['class', 'year', 'affiliation']].groupby(['class', 'year', 'affiliation']).size().to_frame("count").reset_index()
+    chart = Chart(df_process).mark_area(
+        stacked='normalize',
+    ).encode(
+        color=Color('class:N',
+            scale=Scale(
+                domain=["gold", "green", "unknown"], 
+                range=['#FFD700', '#00f64f','#000000'],
+            ),
+        ),
+        column='affiliation:O',
+        x=X('year:T'),
+        y=Y('sum(count):Q',
+            axis=False,
+        ),
+    ).configure_cell(
+        height=200.0,
+        width=300.0,
+    )
 
+    file = open("../scopus_exports/html/class_by_year_stacked_area_trellis_{0}.html".format(suffix), 'w')
+    file.write(chart.to_html())
+    file.close
+class_by_year_stacked_area_trellis(df_filter)
+for api in df_filter.api.unique():    
+    filtered = df_filter[df_filter['api'] == api]
+    class_by_year_stacked_area_trellis(filtered, api)
+
+# Stacked area-chart showing classification by year, trellised by api
+df_process = df_filter[['class', 'year', 'api']].groupby(['class', 'year', 'api']).size().to_frame("count").reset_index()
 chart = Chart(df_process).mark_area(
     stacked='normalize',
 ).encode(
@@ -144,7 +189,7 @@ chart = Chart(df_process).mark_area(
             range=['#FFD700', '#00f64f','#000000'],
         ),
     ),
-    column='affiliation:O',
+    column='api:O',
     x=X('year:T'),
     y=Y('sum(count):Q',
         axis=False,
@@ -154,7 +199,7 @@ chart = Chart(df_process).mark_area(
     width=300.0,
 )
 
-file = open("../scopus_exports/html/class_by_year_stacked_area_trellis.html", 'w')
+file = open("../scopus_exports/html/class_by_year_stacked_area_trellis_by_api.html", 'w')
 file.write(chart.to_html())
 file.close
 

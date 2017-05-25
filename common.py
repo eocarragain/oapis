@@ -216,7 +216,7 @@ class Core(Common):
         for result in raw['data']:
             if 'fulltextIdentifier' in result and result['fulltextIdentifier'] != None:
                 output["pref_pdf_url"] = result['fulltextIdentifier']
-                output["classification"] = "open"     
+                output["classification"] = "green"     
 
             if "fulltextUrls" in result and result['fulltextUrls'] != None:
                 for open_url in result["fulltextUrls"]:
@@ -256,7 +256,7 @@ class OAButton(Common):
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         if has_open_url == True:
-            output["classification"] = "open"
+            output["classification"] = "green"
             if len(all_sources) > 0:
                 output["pref_pdf_url"] = all_sources[0]
         else:
