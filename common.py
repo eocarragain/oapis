@@ -110,7 +110,7 @@ class Dissemin(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi, 'classification': '', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         raw = json.loads(self.response(cache_mode))
         if not 'paper' in raw:
             output['classification'] = 'unknown'
@@ -148,7 +148,7 @@ class Oadoi(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi, 'classification': '', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         raw = json.loads(self.response(cache_mode))
         if not 'results' in raw:
             output['classification'] = 'unknown'
@@ -205,7 +205,7 @@ class Core(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         raw = json.loads(self.response(cache_mode))
         if not 'status' in raw or raw['status'] != 'OK':
             output['classification'] = 'unknown'
@@ -237,7 +237,7 @@ class OAButton(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         raw = json.loads(self.response(cache_mode))
         if not 'status' in raw or raw['status'] != 'success':
             output['classification'] = 'unknown'
@@ -307,7 +307,7 @@ class MSAcademic(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         try:
             raw = json.loads(self.response(cache_mode))
         except:
@@ -354,7 +354,7 @@ class Openaire(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         try:
             raw = json.loads(self.response(cache_mode))
         except:
