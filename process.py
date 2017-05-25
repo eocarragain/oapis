@@ -3,6 +3,7 @@ import pandas as pd
 from altair import *
 import random
 import csv
+import json
 '''
 import pandas as pd
 import numpy as np
@@ -120,6 +121,13 @@ with open(csv_file, 'r', encoding='utf-8', errors='ignore') as csvfile:
 
         #record = common.OAButton(line).parse()
         #classification_by_api.append({"api":"oabutton", "class": record['classification'], "doi": line})
+
+
+with open('../scopus_exports/html/classification_by_api.json', 'w') as f:
+  json.dump(classification_by_api, f, ensure_ascii=False)
+
+with open('../scopus_exports/html/domain_by_api.json', 'w') as f:
+  json.dump(domain_by_api, f, ensure_ascii=False)
 
 # Stacked bar-chart showing classification by API, trellised by affiliation
 year_filter = 2000
