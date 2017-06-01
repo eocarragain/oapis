@@ -4,6 +4,7 @@ import os
 import json
 import string
 import time
+import validators
 
 class Common(object):
     def __init__(self, doi):
@@ -54,9 +55,14 @@ class Common(object):
             return handle
 
     def clean_url(self, url):
+        '''Returns a clean url or False'''
+        url.strip()
+        if validators.url(url) != True:
+            return False
         url = url.replace("dx.doi.org", "doi.org")
         if "hdl.handle.net" in url:
             url = self.handle_lookup(url)
+
         return url
 
     def fetch(self):
@@ -104,7 +110,7 @@ class Dissemin(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         raw = json.loads(self.response(cache_mode))
         if not 'paper' in raw:
             output['classification'] = 'unknown'
@@ -124,7 +130,8 @@ class Dissemin(Common):
         for record in raw['paper']['records']:
             if 'pdf_url' in record:
                 clean = self.clean_url(record['pdf_url'])
-                all_sources.append(clean)
+                if clean != False:
+                    all_sources.append(clean)
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         return output
@@ -141,7 +148,7 @@ class Oadoi(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         raw = json.loads(self.response(cache_mode))
         if not 'results' in raw:
             output['classification'] = 'unknown'
@@ -167,7 +174,8 @@ class Oadoi(Common):
         if "_open_urls" in result:
             for open_url in result["_open_urls"]:
                 clean = self.clean_url(open_url)
-                all_sources.append(clean)
+                if clean != False:
+                    all_sources.append(clean)
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         return output
@@ -197,7 +205,7 @@ class Core(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         raw = json.loads(self.response(cache_mode))
         if not 'status' in raw or raw['status'] != 'OK':
             output['classification'] = 'unknown'
@@ -208,12 +216,13 @@ class Core(Common):
         for result in raw['data']:
             if 'fulltextIdentifier' in result and result['fulltextIdentifier'] != None:
                 output["pref_pdf_url"] = result['fulltextIdentifier']
-                output["classification"] = "open"     
+                output["classification"] = "green"     
 
             if "fulltextUrls" in result and result['fulltextUrls'] != None:
                 for open_url in result["fulltextUrls"]:
                     clean = self.clean_url(open_url)
-                    all_sources.append(clean)
+                    if clean != False:
+                        all_sources.append(clean)
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         return output
@@ -228,7 +237,7 @@ class OAButton(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         raw = json.loads(self.response(cache_mode))
         if not 'status' in raw or raw['status'] != 'success':
             output['classification'] = 'unknown'
@@ -241,12 +250,13 @@ class OAButton(Common):
                 has_open_url = True
                 open_url = result['url']
                 clean = self.clean_url(open_url)
-                all_sources.append(clean)
+                if clean != False:
+                    all_sources.append(clean)
 
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         if has_open_url == True:
-            output["classification"] = "open"
+            output["classification"] = "green"
             if len(all_sources) > 0:
                 output["pref_pdf_url"] = all_sources[0]
         else:
@@ -297,7 +307,7 @@ class MSAcademic(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         try:
             raw = json.loads(self.response(cache_mode))
         except:
@@ -321,7 +331,8 @@ class MSAcademic(Common):
                             if source['Ty'] == 3:
                                 has_open_url = True
                                 clean = self.clean_url(open_url)
-                                all_sources.append(clean)
+                                if clean != False:
+                                    all_sources.append(clean)
                 else:
                     print("result doesn't match DOI. Skipping")
 
@@ -343,7 +354,7 @@ class Openaire(Common):
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         try:
             raw = json.loads(self.response(cache_mode))
         except:
@@ -389,7 +400,8 @@ class Openaire(Common):
                               for resource in webresource_array:
                                   open_url = resource['url']['$']
                                   clean = self.clean_url(open_url)
-                                  all_sources.append(clean)
+                                  if clean != False:
+                                      all_sources.append(clean)
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         if has_open_url == True:
