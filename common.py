@@ -73,9 +73,12 @@ class Common(object):
                 response = r.json()
 
         if response != "":
-            return response["values"][0]["data"]["value"]
-        else:
-            return handle
+            for record in response["values"]:
+                url_value = record["data"]["value"]
+                if isinstance(url_value , str):
+                    return url_value
+        # if we made it here, return the original handle
+        return handle
 
     def clean_url(self, url):
         '''Returns a clean url or False'''
@@ -405,7 +408,7 @@ class Openaire(Common):
 
           for result in result_array:
               children = result['metadata']['oaf:entity']['oaf:result']['children']
-              print(result['metadata']['oaf:entity']['oaf:result']['children'])
+              #print(result['metadata']['oaf:entity']['oaf:result']['children'])
               if 'instance' in children:
                   # instance can either be an instance node or an array of instance nodes
                   instance_array = []
@@ -415,21 +418,22 @@ class Openaire(Common):
                       instance_array = children["instance"]
 
                   for node in instance_array:
-                      if node['licence']['@classid'] == "OPEN":
-                          has_open_url = True
-                          # webresource can be a single node or an array of node
-                          webresource_array = []
-                          if 'webresource' in node:
-                              if 'url' in node['webresource']:
-                                  webresource_array.append(node['webresource'])
-                              elif len(node['webresource']) > 0:
-                                  webresource_array = node['webresource']
+                      if 'licence' in node:
+                          if node['licence']['@classid'] == "OPEN":
+                              has_open_url = True
+                              # webresource can be a single node or an array of node
+                              webresource_array = []
+                              if 'webresource' in node:
+                                  if 'url' in node['webresource']:
+                                      webresource_array.append(node['webresource'])
+                                  elif len(node['webresource']) > 0:
+                                      webresource_array = node['webresource']
 
-                              for resource in webresource_array:
-                                  open_url = resource['url']['$']
-                                  clean = self.clean_url(open_url)
-                                  if clean != False:
-                                      all_sources.append(clean)
+                                  for resource in webresource_array:
+                                      open_url = resource['url']['$']
+                                      clean = self.clean_url(open_url)
+                                      if clean != False:
+                                          all_sources.append(clean)
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         if has_open_url == True:

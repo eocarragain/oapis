@@ -4,14 +4,15 @@ from altair import *
 import random
 import csv
 import json
+import os
 
 classification_by_api = []
 domain_by_api = []
-doi_file = "../scopus_exports/combined_csv/combined_test.csv"
+doi_file = "../scopus_exports/combined_csv/combined.csv"
 classification_by_api_json_file = '../scopus_exports/html/classification_by_api.json'
 domain_by_api_json_file = '../scopus_exports/html/domain_by_api.json'
 load_cached_dictionaries = False
-output_directory = "'../scopus_exports/html/"
+output_directory = "../scopus_exports/html/"
 
 def append_to_dictionaries(api, record):
     classification_by_api.append({"api":api, "class": record['classification'], "affiliation": affiliation, "year": year})
@@ -112,7 +113,7 @@ def class_by_year_stacked_area_trellis(df_filter,suffix="all_apis"):
         height=200.0,
         width=300.0,
     )
-    chart_html_file = os.path.join(output_directory, class_by_year_stacked_area_trellis_{0}.html".format(suffix))
+    chart_html_file = os.path.join(output_directory, "class_by_year_stacked_area_trellis_{0}.html".format(suffix))
     write_chart_to_file(chart_html_file, chart)
 
 class_by_year_stacked_area_trellis(df_filter)
