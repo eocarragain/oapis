@@ -4,74 +4,19 @@ from altair import *
 import random
 import csv
 import json
-'''
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-oa_class = {'gold' : 0, 'green' : 0, 'unknown' : 0, 'open' : 0}
-all_domains = {}
-with open("/media/sf_vm-shared-folder/scopus_exports/DOIs/ucc.txt") as f:
-#with open("dummy.txt") as f:
-    for line in f:
-        line = line.strip('\n')
-        line = line.strip('\r')
-        print (line)
-
-        record = Oadoi(line).parse("cache_only")
-        #record = {}
-        if 'classification' in record:
-            oa_class[record['classification']] += 1
-            if 'domains' in record:
-                for domain in record['domains']:
-                    if domain in all_domains:
-                        print("appending domain {0}".format(domain))
-                        all_domains[domain] += 1
-                    else:
-                        print("creating domain {0}".format(domain))
-                        all_domains[domain] = 1
-print(oa_class)
-print(all_domains)
-#df = pd.DataFrame.from_dict(oa_class, 'index')
-df = pd.DataFrame(list(oa_class.items()), columns=['classification', 'count'])
-plot = df.plot(kind='bar', x="classification")
-fig = plot.get_figure()
-fig.tight_layout()
-fig.savefig("/tmp/output_ucc_oadoi.png")
-
-df2 = pd.DataFrame(list(all_domains.items()), columns=['domain', 'count'])
-other = df2.loc[df2['count'] < 30, 'count'].sum()
-print("other: {0}".format(other))
-df2 =  df2.loc[df2['count'] > 30].sort_values('count')
-df2 = df2.append(pd.DataFrame(list({ 'other' : other }.items()), columns=['domain', 'count']))
-plot2 = df2.plot(kind='bar', x='domain')
-fig2 = plot2.get_figure()
-fig2.tight_layout()
-fig2.savefig("/tmp/output_ucc_oadoi2.png")'''
-
-'''
-with open("/home/laptopia/dev/scopus_exports/DOIs/affilcountry_ie_remainder.txt") as f:
-    for line in f:
-       # line = line.strip('\n')
-       # line = line.strip('\r')
-        print(line)
-        print(Core(line).parse())
-        time.sleep(0.75)
-        #Dissemin(line).response()
-        #Oadoi(line).response()
-'''
-
-'''#doi = "10.1016/j.tetasy.2010.05.004"
-doi = "10.1016/j.paid.2009.02.013"
-print(doi)
-
-d = common.Dissemin(doi)
-print(d.parse())
-
-oadoi = common.Oadoi(doi)
-print(oadoi.parse())'''
 
 classification_by_api = []
 domain_by_api = []
+
+def append_to_dictionaries(api, record):
+    classification_by_api.append({"api":api, "class": record['classification'], "affiliation": affiliation, "year": year})
+    is_pref_url = False
+    for domain in record['domains']:
+        if domain == record['pref_pdf_url']:
+            is_pref_url = True
+        domain_by_api.append({"api":api, "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
+
+
 
 csv_file = "../scopus_exports/combined_csv/combined_test.csv"
 
@@ -83,51 +28,31 @@ with open(csv_file, 'r', encoding='utf-8', errors='ignore') as csvfile:
         year = int(row['Year'])
         affiliation = row['Affiliation']
         print(doi)
+
         record = common.Dissemin(doi).parse()
-        classification_by_api.append({"api":"dissemin", "class": record['classification'], "affiliation": affiliation, "year": year}) 
-        is_pref_url = False
-        for domain in record['domains']:
-            if domain == record['pref_pdf_url']:
-                is_pref_url = True
-            domain_by_api.append({"api":"dissemin", "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
+        append_to_dictionaries("dissemin", record)
 
         record = common.Oadoi(doi).parse()
-        classification_by_api.append({"api":"oadoi", "class": record['classification'], "affiliation": affiliation, "year": year})
-        is_pref_url = False
-        for domain in record['domains']:
-            if domain == record['pref_pdf_url']:
-                is_pref_url = True
-            domain_by_api.append({"api":"oadoi", "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
+        append_to_dictionaries("oadoi", record)
 
         record = common.OAButton(doi).parse()
-        classification_by_api.append({"api":"oabutton", "class": record['classification'], "affiliation": affiliation, "year": year}) 
-        is_pref_url = False
-        for domain in record['domains']:
-            if domain == record['pref_pdf_url']:
-                is_pref_url = True
-            domain_by_api.append({"api":"oabutton", "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
+        append_to_dictionaries("oabutton", record)
 
         record = common.Core(doi).parse()
-        classification_by_api.append({"api":"core", "class": record['classification'], "affiliation": affiliation, "year": year})
-        is_pref_url = False
-        for domain in record['domains']:
-            if domain == record['pref_pdf_url']:
-                is_pref_url = True
-            domain_by_api.append({"api":"core", "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
-
-
-        #record = common.Openaire(line).parse()
-        #classification_by_api.append({"api":"openaire", "class": record['classification'], "doi": line})
-
-        #record = common.OAButton(line).parse()
-        #classification_by_api.append({"api":"oabutton", "class": record['classification'], "doi": line})
-
+        append_to_dictionaries("core", record)
 
 with open('../scopus_exports/html/classification_by_api.json', 'w') as f:
-  json.dump(classification_by_api, f, ensure_ascii=False)
+ json.dump(classification_by_api, f, ensure_ascii=False)
 
 with open('../scopus_exports/html/domain_by_api.json', 'w') as f:
-  json.dump(domain_by_api, f, ensure_ascii=False)
+ json.dump(domain_by_api, f, ensure_ascii=False)
+
+
+# with open('../scopus_exports/html/classification_by_api.json') as json_file:
+#     classification_by_api = json.load(json_file)
+#
+# with open('../scopus_exports/html/domain_by_api.json') as json_file:
+#     domain_by_api = json.load(json_file)
 
 # Stacked bar-chart showing classification by API, trellised by affiliation
 year_filter = 2000
@@ -142,7 +67,7 @@ df_process = df_filter[['api', 'class', 'affiliation']].groupby(['api', 'class',
 chart = Chart(df_process).mark_bar(stacked='normalize',).encode(
     color=Color('class:N',
         scale=Scale(
-            domain=["gold", "green", "unknown"], 
+            domain=["gold", "green", "unknown"],
             range=['#FFD700', '#00f64f','#000000'],
         ),
     ),
@@ -164,7 +89,7 @@ def class_by_year_stacked_area_trellis(df_filter,suffix="all_apis"):
     ).encode(
         color=Color('class:N',
             scale=Scale(
-                domain=["gold", "green", "unknown"], 
+                domain=["gold", "green", "unknown"],
                 range=['#FFD700', '#00f64f','#000000'],
             ),
         ),
@@ -181,8 +106,9 @@ def class_by_year_stacked_area_trellis(df_filter,suffix="all_apis"):
     file = open("../scopus_exports/html/class_by_year_stacked_area_trellis_{0}.html".format(suffix), 'w')
     file.write(chart.to_html())
     file.close
+
 class_by_year_stacked_area_trellis(df_filter)
-for api in df_filter.api.unique():    
+for api in df_filter.api.unique():
     filtered = df_filter[df_filter['api'] == api]
     class_by_year_stacked_area_trellis(filtered, api)
 
@@ -193,7 +119,7 @@ chart = Chart(df_process).mark_area(
 ).encode(
     color=Color('class:N',
         scale=Scale(
-            domain=["gold", "green", "unknown"], 
+            domain=["gold", "green", "unknown"],
             range=['#FFD700', '#00f64f','#000000'],
         ),
     ),
@@ -217,7 +143,7 @@ df_process = df_filter[['class', 'year', 'affiliation']].groupby(['class', 'year
 chart = Chart(df_process).mark_line().encode(
     color=Color('class:N',
         scale=Scale(
-            domain=["gold", "green", "unknown"], 
+            domain=["gold", "green", "unknown"],
             range=['#FFD700', '#00f64f','#000000'],
         ),
     ),
@@ -236,7 +162,7 @@ df_process = df_filter[['class', 'year', 'api']].groupby(['class', 'year', 'api'
 chart = Chart(df_process).mark_line().encode(
     color=Color('class:N',
         scale=Scale(
-            domain=["gold", "green", "unknown"], 
+            domain=["gold", "green", "unknown"],
             range=['#FFD700', '#00f64f','#000000'],
         ),
     ),
@@ -256,7 +182,7 @@ df_process = df_domain[['api', 'domain', 'class']].groupby(['api', 'domain', 'cl
 chart = Chart(df_process).mark_bar(stacked='normalize',).encode(
     color=Color('class:N',
         scale=Scale(
-            domain=["gold", "green", "unknown"], 
+            domain=["gold", "green", "unknown"],
             range=['#FFD700', '#00f64f','#000000'],
         ),
     ),
@@ -292,6 +218,49 @@ def domain_by_api_bar_trellis(df_domain, suffix="all_affiliations"):
 
 df_domain = pd.DataFrame(domain_by_api)
 domain_by_api_bar_trellis(df_domain)
-for affiliation in df_domain.affiliation.unique():    
+for affiliation in df_domain.affiliation.unique():
     filtered = df_domain[df_domain['affiliation'] == affiliation]
     domain_by_api_bar_trellis(filtered, affiliation)
+
+# Compare Irish repository presence -vs- Rian figures
+irish_repos = {
+    'dcu': 'doras.dcu.ie',
+    'dit': 'arrow.dit.ie',
+    'nuim': 'eprints.maynoothuniversity.ie',
+    'nuig': 'aran.library.nuigalway.ie',
+    'rcsi': 'epubs.rcsi.ie',
+    'tcd': 'www.tara.tcd.ie',
+    'ucc': 'cora.ucc.ie',
+    'ucd': 'researchrepository.ucd.ie',
+    'ul': 'ulir.ul.ie'
+}
+
+
+df_domain = pd.DataFrame(domain_by_api)
+df_filtered = df_domain[df_domain['year'] >= 2007]
+
+df_repos = pd.DataFrame()
+#df_repo = df_filtered[(df_filtered['domain'].isin(irish_repos.values())) & (df_filtered['affiliation'].isin(irish_repos))]
+for repo in irish_repos:
+    df_repo = df_filtered[(df_filtered['affiliation'] == repo) & (df_filtered['domain'] == irish_repos[repo])]
+    df_repos = df_repos.append(df_repo)
+df_process = df_repos[['api', 'domain', 'year', 'affiliation']].groupby(['api', 'domain', 'year', 'affiliation']).size().to_frame("count").reset_index()
+
+with open('rian_scopus_by_org_by_year.csv') as csvfile:
+     reader = csv.DictReader(csvfile)
+     for row in reader:
+         affil = row['Institute'].lower()
+         df_process = df_process.append({"api":"rian", "domain": irish_repos[affil], "year": row['Year'], "affiliation": affil, "count": row['Count']}, ignore_index=True)
+         df_process = df_process.append({"api":"scopus", "domain": irish_repos[affil], "year": row['Year'], "affiliation": affil, "count": row['Scopus']}, ignore_index=True)
+
+chart = Chart(df_process).mark_line().encode(
+    color='api:N',
+    column='affiliation:O',
+    x='year:T',
+    y='sum(count):Q',
+)
+
+file = open("../scopus_exports/html/repos_api_coverage_by_year.html", 'w')
+file.write(chart.to_html(vegalite_js_url='https://vega.github.io/vega-lite-v1/vega-lite.js'))
+#file.write(chart.to_html())
+file.close

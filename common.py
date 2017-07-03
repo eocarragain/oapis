@@ -1,4 +1,6 @@
 import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 import hashlib
 import os
 import json
@@ -21,6 +23,27 @@ class Common(object):
         doi = doi.strip()
         return doi
 
+    # Helper method for robust http retries
+    # See https://www.peterbe.com/plog/best-practice-with-retries-with-requests
+    def requests_retry_session(
+        retries=3,
+        backoff_factor=0.5,
+        status_forcelist=(500, 502, 503, 504),
+        session=None,
+    ):
+        session = session or requests.Session()
+        retry = Retry(
+            total=retries,
+            read=retries,
+            connect=retries,
+            backoff_factor=backoff_factor,
+            status_forcelist=status_forcelist,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        session.mount('http://', adapter)
+        session.mount('https://', adapter)
+        return session
+
     def create_cache_dir(self):
         os.makedirs(self.cache_dir, exist_ok=True)
 
@@ -32,7 +55,7 @@ class Common(object):
     def handle_lookup(self, handle):
         #return handle
         #todo verify handle format with regex
-        handle_prefix = handle[:handle.rfind('/')].replace("https", "http") 
+        handle_prefix = handle[:handle.rfind('/')].replace("https", "http")
         handle_cache_dir = "{0}/handle".format(self.base_cache)
         os.makedirs(handle_cache_dir, exist_ok=True)
         handle_digest = hashlib.md5(handle_prefix.encode('utf-8')).hexdigest()
@@ -59,10 +82,11 @@ class Common(object):
         url.strip()
         if validators.url(url) != True:
             return False
-        url = url.replace("dx.doi.org", "doi.org")
+
         if "hdl.handle.net" in url:
             url = self.handle_lookup(url)
-
+        url = url.replace("dx.doi.org", "doi.org")
+        url = url.replace("eprints.nuim.ie", "eprints.maynoothuniversity.ie")
         return url
 
     def fetch(self):
@@ -101,8 +125,8 @@ class Dissemin(Common):
             payload = '{{"doi" : "{0}"}}'.format(self.doi)
             r = requests.post('http://dissem.in/api/query', data = payload)
 
-        # cache on success or on second 404 
-        # this is more consistent with other apis where 
+        # cache on success or on second 404
+        # this is more consistent with other apis where
         # null response is still cached
         if r.status_code == 200 or r.status_code == 404:
            self.cache_response(r.text, self.cache_file)
@@ -216,7 +240,7 @@ class Core(Common):
         for result in raw['data']:
             if 'fulltextIdentifier' in result and result['fulltextIdentifier'] != None:
                 output["pref_pdf_url"] = result['fulltextIdentifier']
-                output["classification"] = "green"     
+                output["classification"] = "green"
 
             if "fulltextUrls" in result and result['fulltextUrls'] != None:
                 for open_url in result["fulltextUrls"]:
@@ -346,7 +370,11 @@ class MSAcademic(Common):
 
 class Openaire(Common):
     def fetch(self):
-        r = requests.get("http://api.openaire.eu/search/publications?doi={0}&format=json".format(self.doi))
+        # leave a two second delay before calling API to rate-limit requests
+        time.sleep(2)
+        # Set a very high backoff factor. If the API is unresponsive under load,
+        # we need to give it time to recover
+        r = self.requests_retry_session(backoff_factor=30).get("http://api.openaire.eu/search/publications?doi={0}&format=json".format(self.doi))
         if r.status_code == 200:
             self.cache_response(r.text, self.cache_file)
         else:
@@ -359,7 +387,7 @@ class Openaire(Common):
             raw = json.loads(self.response(cache_mode))
         except:
             return output
-        
+
         if not 'response' in raw or raw['response']['results'] == None:
             output['classification'] = 'unknown'
             return output
