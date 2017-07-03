@@ -7,6 +7,11 @@ import json
 
 classification_by_api = []
 domain_by_api = []
+doi_file = "../scopus_exports/combined_csv/combined_test.csv"
+classification_by_api_json_file = '../scopus_exports/html/classification_by_api.json'
+domain_by_api_json_file = '../scopus_exports/html/domain_by_api.json'
+load_cached_dictionaries = False
+output_directory = "'../scopus_exports/html/"
 
 def append_to_dictionaries(api, record):
     classification_by_api.append({"api":api, "class": record['classification'], "affiliation": affiliation, "year": year})
@@ -16,43 +21,51 @@ def append_to_dictionaries(api, record):
             is_pref_url = True
         domain_by_api.append({"api":api, "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
 
+def write_chart_to_file(filename, chart):
+    file = open(filename, 'w')
+    file.write(chart.to_html(vegalite_js_url='https://vega.github.io/vega-lite-v1/vega-lite.js'))
+    file.close
 
+if load_cached_dictionaries == True:
+    try:
+        with open(classification_by_api_json_file) as json_file:
+            classification_by_api = json.load(json_file)
 
-csv_file = "../scopus_exports/combined_csv/combined_test.csv"
+        with open(domain_by_api_json_file) as json_file:
+            domain_by_api = json.load(json_file)
+    except:
+        print("Failed to load cached content. Try re-running with load_cached_dictionaries set to False")
+else:
+    with open(doi_file, 'r', encoding='utf-8', errors='ignore') as csvfile:
+        reader = csv.DictReader(csvfile)
 
-with open(csv_file, 'r', encoding='utf-8', errors='ignore') as csvfile:
-    reader = csv.DictReader(csvfile)
+        for row in reader:
+            doi = row['DOI']
+            year = int(row['Year'])
+            affiliation = row['Affiliation']
+            print(doi)
 
-    for row in reader:
-        doi = row['DOI']
-        year = int(row['Year'])
-        affiliation = row['Affiliation']
-        print(doi)
+            record = common.Dissemin(doi).parse()
+            append_to_dictionaries("dissemin", record)
 
-        record = common.Dissemin(doi).parse()
-        append_to_dictionaries("dissemin", record)
+            record = common.Oadoi(doi).parse()
+            append_to_dictionaries("oadoi", record)
 
-        record = common.Oadoi(doi).parse()
-        append_to_dictionaries("oadoi", record)
+            record = common.OAButton(doi).parse()
+            append_to_dictionaries("oabutton", record)
 
-        record = common.OAButton(doi).parse()
-        append_to_dictionaries("oabutton", record)
+            record = common.Core(doi).parse()
+            append_to_dictionaries("core", record)
 
-        record = common.Core(doi).parse()
-        append_to_dictionaries("core", record)
+            record = common.Openaire(doi).parse()
+            append_to_dictionaries("openaire", record)
 
-with open('../scopus_exports/html/classification_by_api.json', 'w') as f:
- json.dump(classification_by_api, f, ensure_ascii=False)
+    # Cache dictionaries to json files
+    with open(classification_by_api_json_file, 'w') as f:
+        json.dump(classification_by_api, f, ensure_ascii=False)
 
-with open('../scopus_exports/html/domain_by_api.json', 'w') as f:
- json.dump(domain_by_api, f, ensure_ascii=False)
-
-
-# with open('../scopus_exports/html/classification_by_api.json') as json_file:
-#     classification_by_api = json.load(json_file)
-#
-# with open('../scopus_exports/html/domain_by_api.json') as json_file:
-#     domain_by_api = json.load(json_file)
+    with open(domain_by_api_json_file, 'w') as f:
+        json.dump(domain_by_api, f, ensure_ascii=False)
 
 # Stacked bar-chart showing classification by API, trellised by affiliation
 year_filter = 2000
@@ -75,11 +88,8 @@ chart = Chart(df_process).mark_bar(stacked='normalize',).encode(
     x='sum(count):Q',
     y='api:N',
 )
-
-file = open("../scopus_exports/html/class_by_api_stacked_bar_trellis.html", 'w')
-file.write(chart.to_html())
-file.close
-
+chart_html_file = os.path.join(output_directory, 'class_by_api_stacked_bar_trellis.html')
+write_chart_to_file(chart_html_file, chart)
 
 # Stacked area-chart showing classification by year, trellised by affiliation
 def class_by_year_stacked_area_trellis(df_filter,suffix="all_apis"):
@@ -102,10 +112,8 @@ def class_by_year_stacked_area_trellis(df_filter,suffix="all_apis"):
         height=200.0,
         width=300.0,
     )
-
-    file = open("../scopus_exports/html/class_by_year_stacked_area_trellis_{0}.html".format(suffix), 'w')
-    file.write(chart.to_html())
-    file.close
+    chart_html_file = os.path.join(output_directory, class_by_year_stacked_area_trellis_{0}.html".format(suffix))
+    write_chart_to_file(chart_html_file, chart)
 
 class_by_year_stacked_area_trellis(df_filter)
 for api in df_filter.api.unique():
@@ -132,10 +140,8 @@ chart = Chart(df_process).mark_area(
     height=200.0,
     width=300.0,
 )
-
-file = open("../scopus_exports/html/class_by_year_stacked_area_trellis_by_api.html", 'w')
-file.write(chart.to_html())
-file.close
+chart_html_file = os.path.join(output_directory, 'class_by_year_stacked_area_trellis_by_api.html')
+write_chart_to_file(chart_html_file, chart)
 
 
 # Multi-line chart showing classification by year, trellised by affiliation
@@ -151,11 +157,8 @@ chart = Chart(df_process).mark_line().encode(
     x='year:T',
     y='sum(count):Q',
 )
-
-file = open("../scopus_exports/html/class_by_year_multi_line_trellis.html", 'w')
-file.write(chart.to_html())
-file.close
-
+chart_html_file = os.path.join(output_directory, 'class_by_year_multi_line_trellis.html')
+write_chart_to_file(chart_html_file, chart)
 
 # Multi-line area-chart showing classification by year, trellised by api
 df_process = df_filter[['class', 'year', 'api']].groupby(['class', 'year', 'api']).size().to_frame("count").reset_index()
@@ -170,11 +173,8 @@ chart = Chart(df_process).mark_line().encode(
     x='year:T',
     y='sum(count):Q',
 )
-
-file = open("../scopus_exports/html/class_by_year_by_api_multi_line_trellis.html", 'w')
-file.write(chart.to_html())
-file.close
-
+chart_html_file = os.path.join(output_directory, 'class_by_year_by_api_multi_line_trellis.html')
+write_chart_to_file(chart_html_file, chart)
 
 # Stacked bar chart of classificaiton by domain; trelissed by api
 df_domain = pd.DataFrame(domain_by_api)
@@ -190,11 +190,8 @@ chart = Chart(df_process).mark_bar(stacked='normalize',).encode(
     x='sum(count):Q',
     y='domain:N',
 )
-
-file = open("../scopus_exports/html/domain_by_api_stacked_bar_trellis.html", 'w')
-file.write(chart.to_html())
-file.close
-
+chart_html_file = os.path.join(output_directory, 'domain_by_api_stacked_bar_trellis.html')
+write_chart_to_file(chart_html_file, chart)
 
 # Bar chart of top domains; trellised by api
 def domain_by_api_bar_trellis(df_domain, suffix="all_affiliations"):
@@ -211,10 +208,8 @@ def domain_by_api_bar_trellis(df_domain, suffix="all_affiliations"):
         x='domain:N',
         y='count:Q',
     )
-
-    file = open("../scopus_exports/html/domain_by_api_bar_trellis_{0}.html".format(suffix), 'w')
-    file.write(chart.to_html())
-    file.close
+    chart_html_file = os.path.join(output_directory, "domain_by_api_bar_trellis_{0}.html".format(suffix))
+    write_chart_to_file(chart_html_file, chart)
 
 df_domain = pd.DataFrame(domain_by_api)
 domain_by_api_bar_trellis(df_domain)
@@ -259,8 +254,5 @@ chart = Chart(df_process).mark_line().encode(
     x='year:T',
     y='sum(count):Q',
 )
-
-file = open("../scopus_exports/html/repos_api_coverage_by_year.html", 'w')
-file.write(chart.to_html(vegalite_js_url='https://vega.github.io/vega-lite-v1/vega-lite.js'))
-#file.write(chart.to_html())
-file.close
+chart_html_file = os.path.join(output_directory, 'repos_api_coverage_by_year.html')
+write_chart_to_file(chart_html_file, chart)
