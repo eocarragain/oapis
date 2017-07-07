@@ -144,7 +144,7 @@ class Dissemin(Common):
             return output
 
         if 'pdf_url' in raw['paper']:
-            output["pref_pdf_url"] = raw['paper']['pdf_url']
+            output["pref_pdf_url"] = self.clean_url(raw['paper']['pdf_url'])
 
         if 'classification' in raw['paper'] and raw['paper']['classification'] == 'OA':
             output["classification"] = 'gold'
@@ -184,7 +184,7 @@ class Oadoi(Common):
         has_open_url = False
         result = raw['results'][0]
         if '_best_open_url' in result and result['_best_open_url'] != None:
-            output["pref_pdf_url"] = result['_best_open_url']
+            output["pref_pdf_url"] = self.clean_url(result['_best_open_url'])
             has_open_url = True
 
         if 'oa_color' in result and result['oa_color'] != None:
@@ -242,7 +242,7 @@ class Core(Common):
         has_open_url = False
         for result in raw['data']:
             if 'fulltextIdentifier' in result and result['fulltextIdentifier'] != None:
-                output["pref_pdf_url"] = result['fulltextIdentifier']
+                output["pref_pdf_url"] = self.clean_url(result['fulltextIdentifier'])
                 output["classification"] = "green"
 
             if "fulltextUrls" in result and result['fulltextUrls'] != None:
@@ -285,7 +285,7 @@ class OAButton(Common):
         if has_open_url == True:
             output["classification"] = "green"
             if len(all_sources) > 0:
-                output["pref_pdf_url"] = all_sources[0]
+                output["pref_pdf_url"] = self.clean_url(all_sources[0])
         else:
             output["classification"] = "unknown"
         return output
@@ -368,7 +368,7 @@ class MSAcademic(Common):
         if has_open_url == True:
             output['classification'] = 'green'
             if len(all_sources) > 0:
-                output["pref_pdf_url"] = all_sources[0]
+                output["pref_pdf_url"] = self.clean_url(all_sources[0])
         return output
 
 class Openaire(Common):
@@ -377,7 +377,7 @@ class Openaire(Common):
         time.sleep(2)
         # Set a very high backoff factor. If the API is unresponsive under load,
         # we need to give it time to recover
-        r = self.requests_retry_session(backoff_factor=30).get("http://api.openaire.eu/search/publications?doi={0}&format=json".format(self.doi))
+        r = requests.get("http://api.openaire.eu/search/publications?doi={0}&format=json".format(self.doi))
         if r.status_code == 200:
             self.cache_response(r.text, self.cache_file)
         else:
@@ -439,5 +439,5 @@ class Openaire(Common):
         if has_open_url == True:
             output['classification'] = 'green'
             if len(all_sources) > 0:
-                output["pref_pdf_url"] = all_sources[0]
+                output["pref_pdf_url"] = self.clean_url(all_sources[0])
         return output

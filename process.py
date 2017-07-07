@@ -8,19 +8,60 @@ import os
 
 classification_by_api = []
 domain_by_api = []
-doi_file = "../scopus_exports/combined_csv/combined.csv"
+doi_summary = {}
+doi_file = "../scopus_exports/combined_csv/combined_test.csv"
 classification_by_api_json_file = '../scopus_exports/html/classification_by_api.json'
 domain_by_api_json_file = '../scopus_exports/html/domain_by_api.json'
+doi_summary_json_file = '../scopus_exports/html/doi_summary.json'
 load_cached_dictionaries = False
 output_directory = "../scopus_exports/html/"
+api_cache_mode="cache_only" # cache_only elif# fill
+irish_repos = {
+    'dcu': 'doras.dcu.ie',
+    'dit': 'arrow.dit.ie',
+    'nuim': 'eprints.maynoothuniversity.ie',
+    'nuig': 'aran.library.nuigalway.ie',
+    'rcsi': 'epubs.rcsi.ie',
+    'tcd': 'www.tara.tcd.ie',
+    'ucc': 'cora.ucc.ie',
+    'ucd': 'researchrepository.ucd.ie',
+    'ul': 'ulir.ul.ie'
+}
 
-def append_to_dictionaries(api, record):
-    classification_by_api.append({"api":api, "class": record['classification'], "affiliation": affiliation, "year": year})
+
+def append_to_dictionaries(api, record, year, affilation):
+    doi = record['doi']
+    classification = record['classification']
+    domains = record['domains']
+    pref_pdf_url = record['pref_pdf_url']
+    if pref_pdf_url and not pref_pdf_url.isspace():
+        pref_pdf_url = [pref_pdf_url]
+    else:
+        pref_pdf_url = []
+    if doi in doi_summary:
+        if classification == 'gold':
+            doi_summary[doi]["class"] = 'gold'
+        elif classification == 'green' and doi_summary[doi]["class"] != 'gold':
+            doi_summary[doi]["class"] = 'green'
+        doi_summary[doi]["domains"] = list(set(doi_summary[doi]["domains"] + domains))
+        doi_summary[doi]["pref_pdf_urls"] = list(set(doi_summary[doi]["pref_pdf_urls"] + pref_pdf_url))
+        doi_summary[doi]["affiliations"] = list(set(doi_summary[doi]["affiliations"] + [affiliation]))
+    else:
+        doi_summary[doi] = {
+            "doi" : doi,
+            "class": classification,
+            "domains": domains,
+            "pref_pdf_urls": pref_pdf_url,
+            "affiliations": [affiliation],
+            "year": int(year)
+        }
+
+    classification_by_api.append({"api":api, "class": classification, "affiliation": affiliation, "year": year})
     is_pref_url = False
-    for domain in record['domains']:
-        if domain == record['pref_pdf_url']:
+    for domain in domains:
+        if domain == pref_pdf_url:
             is_pref_url = True
-        domain_by_api.append({"api":api, "class": record['classification'], "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
+        domain_by_api.append({"api":api, "class": classification, "affiliation": affiliation, "year": year, "domain": domain, "is_pref_url": is_pref_url})
 
 def write_chart_to_file(filename, chart):
     file = open(filename, 'w')
@@ -34,6 +75,9 @@ if load_cached_dictionaries == True:
 
         with open(domain_by_api_json_file) as json_file:
             domain_by_api = json.load(json_file)
+
+        with open(doi_summary_json_file) as json_file:
+            doi_summary = json.load(json_file)
     except:
         print("Failed to load cached content. Try re-running with load_cached_dictionaries set to False")
 else:
@@ -46,20 +90,20 @@ else:
             affiliation = row['Affiliation']
             print(doi)
 
-            record = common.Dissemin(doi).parse()
-            append_to_dictionaries("dissemin", record)
+            record = common.Dissemin(doi).parse(cache_mode=api_cache_mode)
+            append_to_dictionaries("dissemin", record, year, affiliation)
 
-            record = common.Oadoi(doi).parse()
-            append_to_dictionaries("oadoi", record)
+            record = common.Oadoi(doi).parse(cache_mode=api_cache_mode)
+            append_to_dictionaries("oadoi", record, year, affiliation)
 
-            record = common.OAButton(doi).parse()
-            append_to_dictionaries("oabutton", record)
+            record = common.OAButton(doi).parse(cache_mode=api_cache_mode)
+            append_to_dictionaries("oabutton", record, year, affiliation)
 
-            record = common.Core(doi).parse()
-            append_to_dictionaries("core", record)
+            record = common.Core(doi).parse(cache_mode=api_cache_mode)
+            append_to_dictionaries("core", record, year, affiliation)
 
-            record = common.Openaire(doi).parse()
-            append_to_dictionaries("openaire", record)
+            record = common.Openaire(doi).parse(cache_mode=api_cache_mode)
+            append_to_dictionaries("openaire", record, year, affiliation)
 
     # Cache dictionaries to json files
     with open(classification_by_api_json_file, 'w') as f:
@@ -68,6 +112,8 @@ else:
     with open(domain_by_api_json_file, 'w') as f:
         json.dump(domain_by_api, f, ensure_ascii=False)
 
+    with open(doi_summary_json_file, 'w') as f:
+        json.dump(doi_summary, f, ensure_ascii=False)
 # Stacked bar-chart showing classification by API, trellised by affiliation
 year_filter = 2000
 df = pd.DataFrame(classification_by_api)
@@ -86,10 +132,10 @@ chart = Chart(df_process).mark_bar(stacked='normalize',).encode(
         ),
     ),
     column='affiliation:O',
-    x='sum(count):Q',
+    x=X('sum(count):Q', axis=Axis(title='OA Classification')),
     y='api:N',
 )
-chart_html_file = os.path.join(output_directory, 'class_by_api_stacked_bar_trellis.html')
+chart_html_file = os.path.join(output_directory, 'class_by_api-stacked_bar-affil_trellis.html')
 write_chart_to_file(chart_html_file, chart)
 
 # Stacked area-chart showing classification by year, trellised by affiliation
@@ -105,15 +151,13 @@ def class_by_year_stacked_area_trellis(df_filter,suffix="all_apis"):
             ),
         ),
         column='affiliation:O',
-        x=X('year:T'),
-        y=Y('sum(count):Q',
-            axis=False,
-        ),
+        x=X('year:T', timeUnit="year", axis=Axis(title='Year')),
+        y=Y('sum(count):Q', axis=Axis(title='OA Classification')),
     ).configure_cell(
         height=200.0,
         width=300.0,
     )
-    chart_html_file = os.path.join(output_directory, "class_by_year_stacked_area_trellis_{0}.html".format(suffix))
+    chart_html_file = os.path.join(output_directory, "class_by_year-stacked_area-affil_trellis-{0}.html".format(suffix))
     write_chart_to_file(chart_html_file, chart)
 
 class_by_year_stacked_area_trellis(df_filter)
@@ -122,7 +166,19 @@ for api in df_filter.api.unique():
     class_by_year_stacked_area_trellis(filtered, api)
 
 # Stacked area-chart showing classification by year, trellised by api
+# Include a "merged" to show the most optimistic view across all apis
+df_doi_summary = pd.DataFrame()
+for doi in doi_summary:
+    doi_dict = doi_summary[doi]
+    doi_dict['api'] = 'all apis combined'
+    df_doi_summary = df_doi_summary.append(doi_dict, ignore_index=True)
+
+df_doi_summary = df_doi_summary[df_doi_summary['year'] >= year_filter]
+df_doi_summary = df_doi_summary[['class', 'year', 'api']].groupby(['class', 'year', 'api']).size().to_frame("count").reset_index()
+
 df_process = df_filter[['class', 'year', 'api']].groupby(['class', 'year', 'api']).size().to_frame("count").reset_index()
+df_process = df_process.append(df_doi_summary)
+print(df_process)
 chart = Chart(df_process).mark_area(
     stacked='normalize',
 ).encode(
@@ -133,33 +189,38 @@ chart = Chart(df_process).mark_area(
         ),
     ),
     column='api:O',
-    x=X('year:T'),
-    y=Y('sum(count):Q',
-        axis=False,
-    ),
+    #x='year:T',
+    x=X('year:T', timeUnit="year", axis=Axis(title='Year')),
+    y=Y('sum(count):Q', axis=Axis(title='OA Classification')),
 ).configure_cell(
     height=200.0,
     width=300.0,
 )
-chart_html_file = os.path.join(output_directory, 'class_by_year_stacked_area_trellis_by_api.html')
+chart_html_file = os.path.join(output_directory, 'class_by_year-stacked_area-api_trellis.html')
 write_chart_to_file(chart_html_file, chart)
 
 
 # Multi-line chart showing classification by year, trellised by affiliation
-df_process = df_filter[['class', 'year', 'affiliation']].groupby(['class', 'year', 'affiliation']).size().to_frame("count").reset_index()
-chart = Chart(df_process).mark_line().encode(
-    color=Color('class:N',
-        scale=Scale(
-            domain=["gold", "green", "unknown"],
-            range=['#FFD700', '#00f64f','#000000'],
+def class_by_year_multi_line_trellis(df_filter,suffix="all_apis"):
+    df_process = df_filter[['class', 'year', 'affiliation']].groupby(['class', 'year', 'affiliation']).size().to_frame("count").reset_index()
+    chart = Chart(df_process).mark_line().encode(
+        color=Color('class:N',
+            scale=Scale(
+                domain=["gold", "green", "unknown"],
+                range=['#FFD700', '#00f64f','#000000'],
+            ),
         ),
-    ),
-    column='affiliation:O',
-    x='year:T',
-    y='sum(count):Q',
-)
-chart_html_file = os.path.join(output_directory, 'class_by_year_multi_line_trellis.html')
-write_chart_to_file(chart_html_file, chart)
+        column='affiliation:O',
+        x=X('year:T', timeUnit="year", axis=Axis(title='Year')),
+        y=Y('count:Q', axis=Axis(title='Number of records')),
+    )
+    chart_html_file = os.path.join(output_directory, "class_by_year-multi_line-affil_trellis-{0}.html".format(suffix))
+    write_chart_to_file(chart_html_file, chart)
+
+class_by_year_multi_line_trellis(df_filter)
+for api in df_filter.api.unique():
+    filtered = df_filter[df_filter['api'] == api]
+    class_by_year_multi_line_trellis(filtered, api)
 
 # Multi-line area-chart showing classification by year, trellised by api
 df_process = df_filter[['class', 'year', 'api']].groupby(['class', 'year', 'api']).size().to_frame("count").reset_index()
@@ -171,27 +232,10 @@ chart = Chart(df_process).mark_line().encode(
         ),
     ),
     column='api:O',
-    x='year:T',
-    y='sum(count):Q',
+    x=X('year:T', timeUnit="year", axis=Axis(title='Year')),
+    y=Y('count:Q', axis=Axis(title='Number of records')),
 )
-chart_html_file = os.path.join(output_directory, 'class_by_year_by_api_multi_line_trellis.html')
-write_chart_to_file(chart_html_file, chart)
-
-# Stacked bar chart of classificaiton by domain; trelissed by api
-df_domain = pd.DataFrame(domain_by_api)
-df_process = df_domain[['api', 'domain', 'class']].groupby(['api', 'domain', 'class']).size().to_frame("count").reset_index()
-chart = Chart(df_process).mark_bar(stacked='normalize',).encode(
-    color=Color('class:N',
-        scale=Scale(
-            domain=["gold", "green", "unknown"],
-            range=['#FFD700', '#00f64f','#000000'],
-        ),
-    ),
-    column='api:O',
-    x='sum(count):Q',
-    y='domain:N',
-)
-chart_html_file = os.path.join(output_directory, 'domain_by_api_stacked_bar_trellis.html')
+chart_html_file = os.path.join(output_directory, 'class_by_year-multi_line-api_trellis.html')
 write_chart_to_file(chart_html_file, chart)
 
 # Bar chart of top domains; trellised by api
@@ -207,9 +251,9 @@ def domain_by_api_bar_trellis(df_domain, suffix="all_affiliations"):
     chart = Chart(df_filtered).mark_bar().encode(
         column='api:O',
         x='domain:N',
-        y='count:Q',
+        y=Y('count:Q', axis=Axis(title='Number of records')),
     )
-    chart_html_file = os.path.join(output_directory, "domain_by_api_bar_trellis_{0}.html".format(suffix))
+    chart_html_file = os.path.join(output_directory, "record_count_by_domain-bar-api_trellis-{0}.html".format(suffix))
     write_chart_to_file(chart_html_file, chart)
 
 df_domain = pd.DataFrame(domain_by_api)
@@ -219,41 +263,57 @@ for affiliation in df_domain.affiliation.unique():
     domain_by_api_bar_trellis(filtered, affiliation)
 
 # Compare Irish repository presence -vs- Rian figures
-irish_repos = {
-    'dcu': 'doras.dcu.ie',
-    'dit': 'arrow.dit.ie',
-    'nuim': 'eprints.maynoothuniversity.ie',
-    'nuig': 'aran.library.nuigalway.ie',
-    'rcsi': 'epubs.rcsi.ie',
-    'tcd': 'www.tara.tcd.ie',
-    'ucc': 'cora.ucc.ie',
-    'ucd': 'researchrepository.ucd.ie',
-    'ul': 'ulir.ul.ie'
-}
-
-
 df_domain = pd.DataFrame(domain_by_api)
 df_filtered = df_domain[df_domain['year'] >= 2007]
 
 df_repos = pd.DataFrame()
-#df_repo = df_filtered[(df_filtered['domain'].isin(irish_repos.values())) & (df_filtered['affiliation'].isin(irish_repos))]
-for repo in irish_repos:
-    df_repo = df_filtered[(df_filtered['affiliation'] == repo) & (df_filtered['domain'] == irish_repos[repo])]
-    df_repos = df_repos.append(df_repo)
-df_process = df_repos[['api', 'domain', 'year', 'affiliation']].groupby(['api', 'domain', 'year', 'affiliation']).size().to_frame("count").reset_index()
-
+df_repos_all = pd.DataFrame()
 with open('rian_scopus_by_org_by_year.csv') as csvfile:
      reader = csv.DictReader(csvfile)
      for row in reader:
          affil = row['Institute'].lower()
-         df_process = df_process.append({"api":"rian", "domain": irish_repos[affil], "year": row['Year'], "affiliation": affil, "count": row['Count']}, ignore_index=True)
-         df_process = df_process.append({"api":"scopus", "domain": irish_repos[affil], "year": row['Year'], "affiliation": affil, "count": row['Scopus']}, ignore_index=True)
+         df_repos = df_repos.append({"api":"rian", "domain": irish_repos[affil], "year": row['Year'], "affiliation": affil, "count": row['Count']}, ignore_index=True)
+         df_repos_all = df_repos_all.append({"api":"rian", "domain": irish_repos[affil], "year": row['Year'], "affiliation": affil, "count": row['Count']}, ignore_index=True)
 
-chart = Chart(df_process).mark_line().encode(
+         #df_repos = df_repos.append({"api":"scopus", "domain": irish_repos[affil], "year": row['Year'], "affiliation": affil, "count": row['Scopus']}, ignore_index=True)
+
+#df_repo = df_filtered[(df_filtered['domain'].isin(irish_repos.values())) & (df_filtered['affiliation'].isin(irish_repos))]
+for repo in irish_repos:
+    df_repo = df_filtered[(df_filtered['affiliation'] == repo) & (df_filtered['domain'] == irish_repos[repo])]
+    df_process = df_repo[['api', 'domain', 'year', 'affiliation']].groupby(['api', 'domain', 'year', 'affiliation']).size().to_frame("count").reset_index()
+    df_repos_all = df_repos_all.append(df_process)
+    df_process = df_process.append(df_repos[(df_repos['affiliation'] == repo) & (df_repos['domain'] == irish_repos[repo])])
+
+    chart = Chart(df_process).mark_line().encode(
+        color='api:N',
+        x=X('year:T', timeUnit="year", axis=Axis(title='Year')),
+        y=Y('count:Q', axis=Axis(title='Number of records')),
+    )
+    chart_html_file = os.path.join(output_directory, "apis_and_rian_by_year-multi_line-{0}.html".format(irish_repos[repo]))
+    write_chart_to_file(chart_html_file, chart)
+
+
+chart = Chart(df_repos_all).mark_line().encode(
     color='api:N',
-    column='affiliation:O',
-    x='year:T',
-    y='sum(count):Q',
+    column=Column('affiliation:O', axis=Axis(title='Institutional Affliation')),
+    x=X('year:T', timeUnit="year", axis=Axis(title='Year')),
+    y=Y('count:Q', axis=Axis(title='Number of records')),
 )
-chart_html_file = os.path.join(output_directory, 'repos_api_coverage_by_year.html')
+chart_html_file = os.path.join(output_directory, "apis_and_rian_by_year-multi_line-all_repos.html")
 write_chart_to_file(chart_html_file, chart)
+
+
+doi_summary_counts = {
+    "total": 0,
+    "only_one_irish_repo": 0,
+    "only_multiple_irish_repos": 0,
+    "irish_repo_and_other": 0,
+    "not_in_irish_repo": 0,
+    "in_irish_repo_and gold": 0,
+    "only_in_researchgate": 0,
+    "in_reserchgate": 0
+    "irish_repo_a_pref_url": 0
+}
+
+for doi in doi_summary:
+     
