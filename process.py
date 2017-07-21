@@ -9,11 +9,11 @@ import os
 classification_by_api = []
 domain_by_api = []
 doi_summary = {}
-doi_file = "../scopus_exports/combined_csv/combined_test.csv"
+doi_file = "../scopus_exports/combined_csv/combined.csv"
 classification_by_api_json_file = '../scopus_exports/html/classification_by_api.json'
 domain_by_api_json_file = '../scopus_exports/html/domain_by_api.json'
 doi_summary_json_file = '../scopus_exports/html/doi_summary.json'
-load_cached_dictionaries = False
+load_cached_dictionaries = True
 output_directory = "../scopus_exports/html/"
 api_cache_mode="cache_only" # cache_only elif# fill
 irish_repos = {
@@ -169,16 +169,17 @@ for api in df_filter.api.unique():
 # Include a "merged" to show the most optimistic view across all apis
 df_doi_summary = pd.DataFrame()
 for doi in doi_summary:
+    #print(doi)
     doi_dict = doi_summary[doi]
     doi_dict['api'] = 'all apis combined'
     df_doi_summary = df_doi_summary.append(doi_dict, ignore_index=True)
+
 
 df_doi_summary = df_doi_summary[df_doi_summary['year'] >= year_filter]
 df_doi_summary = df_doi_summary[['class', 'year', 'api']].groupby(['class', 'year', 'api']).size().to_frame("count").reset_index()
 
 df_process = df_filter[['class', 'year', 'api']].groupby(['class', 'year', 'api']).size().to_frame("count").reset_index()
 df_process = df_process.append(df_doi_summary)
-print(df_process)
 chart = Chart(df_process).mark_area(
     stacked='normalize',
 ).encode(
@@ -217,7 +218,7 @@ def class_by_year_multi_line_trellis(df_filter,suffix="all_apis"):
     chart_html_file = os.path.join(output_directory, "class_by_year-multi_line-affil_trellis-{0}.html".format(suffix))
     write_chart_to_file(chart_html_file, chart)
 
-class_by_year_multi_line_trellis(df_filter)
+# class_by_year_multi_line_trellis(df_filter)
 for api in df_filter.api.unique():
     filtered = df_filter[df_filter['api'] == api]
     class_by_year_multi_line_trellis(filtered, api)
@@ -302,18 +303,116 @@ chart = Chart(df_repos_all).mark_line().encode(
 chart_html_file = os.path.join(output_directory, "apis_and_rian_by_year-multi_line-all_repos.html")
 write_chart_to_file(chart_html_file, chart)
 
-
+# Get DOI Summary counts as bar chart
 doi_summary_counts = {
     "total": 0,
+    "available": 0,
+    "gold": 0,
+    "green": 0,
     "only_one_irish_repo": 0,
-    "only_multiple_irish_repos": 0,
-    "irish_repo_and_other": 0,
-    "not_in_irish_repo": 0,
-    "in_irish_repo_and gold": 0,
+    "only_irish_repos": 0,
+    "in_multiple_irish_repos": 0,
+    "in_non_irish_repo": 0,
+    "in_irish_repo_and_gold": 0,
     "only_in_researchgate": 0,
-    "in_reserchgate": 0
-    "irish_repo_a_pref_url": 0
+    "in_researchgate": 0,
+    "in_irish_repo": 0,
 }
 
+irish_repo_domains = list(irish_repos.values())
+
+def intersect(l1, l2):
+    return len([i for i in l1 if i in l2])
+
+summary_series = []
+
 for doi in doi_summary:
-     
+    record = doi_summary[doi]
+    domains = record["domains"]
+    year = record["year"]
+    no_of_irish_repos = intersect(domains, irish_repo_domains)
+
+    doi_summary_counts["total"] += 1
+    summary_series.append({"year": year, "series": "total"})
+
+    if len(domains) > 0:
+        doi_summary_counts["available"] += 1
+        summary_series.append({"year": year, "series": "available"})
+
+    if len(domains) > 0 and record["class"] == "gold":
+        doi_summary_counts["gold"] += 1
+        summary_series.append({"year": year, "series": "gold"})
+
+    if len(domains) > 0 and record["class"] == "green":
+        doi_summary_counts["green"] += 1
+        summary_series.append({"year": year, "series": "green"})
+
+    if len(domains) == 1 and no_of_irish_repos > 0:
+        doi_summary_counts["only_one_irish_repo"] += 1
+
+    if len(domains) > 0 and no_of_irish_repos == len(domains):
+        doi_summary_counts["only_irish_repos"] += 1
+        summary_series.append({"year": year, "series": "only_irish_repos"})
+
+    if no_of_irish_repos > 1:
+        doi_summary_counts["in_multiple_irish_repos"] += 1
+        summary_series.append({"year": year, "series": "in_multiple_irish_repos"})
+
+    if len(domains) > 0 and no_of_irish_repos == 0:
+        doi_summary_counts["in_non_irish_repo"] += 1
+        summary_series.append({"year": year, "series": "in_non_irish_repo"})
+
+    if no_of_irish_repos > 0 and record["class"] == "gold":
+        doi_summary_counts["in_irish_repo_and_gold"] += 1
+        summary_series.append({"year": year, "series": "in_irish_repo_and_gold"})
+
+    if len(domains) == 1 and domains[0] == "www.researchgate.net":
+        doi_summary_counts["only_in_researchgate"] += 1
+        summary_series.append({"year": year, "series": "only_in_researchgate"})
+
+    if len(domains) > 0 and "www.researchgate.net" in domains:
+        doi_summary_counts["in_researchgate"] += 1
+        summary_series.append({"year": year, "series": "in_researchgate"})
+
+    if no_of_irish_repos > 0:
+        doi_summary_counts["in_irish_repo"] += 1
+        summary_series.append({"year": year, "series": "in_irish_repo"})
+
+def pge(total, sub):
+    return (sub/total)*100
+
+total = doi_summary_counts["total"]
+vals = [
+    {"label": "Available", "percent": pge(total, doi_summary_counts["available"])},
+    {"label": "Gold OA", "percent": pge(total, doi_summary_counts["gold"])},
+    {"label": "Green OA", "percent": pge(total, doi_summary_counts["green"])},
+    {"label": "Only in 1 Irish repo.", "percent": pge(total, doi_summary_counts["only_one_irish_repo"])},
+    {"label": "Only in Irish repos.", "percent": pge(total, doi_summary_counts["only_irish_repos"])},
+    {"label": "In multiple Irish repos", "percent": pge(total, doi_summary_counts["in_multiple_irish_repos"])},
+    {"label": "In non-Irish repo source", "percent": pge(total, doi_summary_counts["in_non_irish_repo"])},
+    {"label": "In Irish repo and Gold OA", "percent": pge(total, doi_summary_counts["in_irish_repo_and_gold"])},
+    {"label": "Only in ResearchGate", "percent": pge(total, doi_summary_counts["only_in_researchgate"])},
+    {"label": "In ResearchGate", "percent": pge(total, doi_summary_counts["in_researchgate"])},
+    {"label": "In Irish repo", "percent": pge(total, doi_summary_counts["in_irish_repo"])},
+]
+
+chart = Chart(Data(values=vals)).mark_bar().encode(
+    x=X('label:O', sort=SortField(op="mean", field="percent", order="descending")),
+    y=Y('percent:Q'),
+)
+chart_html_file = os.path.join(output_directory, "doi_summary_counts-bar.html")
+write_chart_to_file(chart_html_file, chart)
+
+df_series = pd.DataFrame(summary_series)
+df_filter = df_series[df_series['year'] >= year_filter]
+df_process = df_filter.groupby(['series', 'year']).size().to_frame("count").reset_index()
+chart = Chart(df_process).mark_line().encode(
+    color='series:N',
+    x=X('year:T', timeUnit="year", axis=Axis(title='Year')),
+    y=Y('count:Q', axis=Axis(title='Number of records')),
+).configure_cell(
+    height=600.0,
+    width=600.0,
+)
+chart_html_file = os.path.join(output_directory, "doi_summary_series_by_year-multi_line.html")
+write_chart_to_file(chart_html_file, chart)
