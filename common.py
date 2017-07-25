@@ -9,13 +9,28 @@ import time
 import validators
 
 class Common(object):
-    def __init__(self, doi):
+    metadata_template = {
+        "title": None, # string, single value
+        "pub_year": None, # int, single value
+        "subtitle": None, # string, single value
+        "publiser": None, # string, single value
+        "type": None, # string, single value (currently crossref types)
+        "subjects": None, # array of strings
+        "authors": None, # array of author elements (currently crossref contributor type)
+        "container_title": None, # string, single value
+        "funders": None, # array of funding elements (currently crossref funder type)
+    }
+
+    def __init__(self, doi, init_metadata=False):
         self.doi = self.clean_doi(doi)
         self.base_cache = "./cache"
         self.cache_dir = "{0}/{1}".format(self.base_cache, self.__class__.__name__.lower())
         self.create_cache_dir()
         doi_digest = hashlib.md5(self.doi.encode('utf-8')).hexdigest()
         self.cache_file = os.path.join(self.cache_dir, doi_digest + ".json")
+        self.metadata = None
+        if init_metadata == True:
+            self.metadata = self.fetch_metadata()
 
     def clean_doi(self, doi):
         doi = doi.strip('\n')
@@ -119,6 +134,55 @@ class Common(object):
                     domains.append(domain)
         return domains
 
+    # convenience methods for fetching and accessing descriptive metadata
+
+    def fetch_metadata(self):
+        # Could check DOI agency from API, but wasteful in most cases
+        # Try crossref first (vast majority)
+        # Then try Datacite
+        # Individual classes can over-ride to fall back on their own metadata
+        cr = Crossref(self.doi)
+        if cr.metadata['title']:
+            return cr.metadata
+        else:
+            return Datacite(self.doi).metadata
+
+    def get_title(self):
+        # self.metadata may not be initialised
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['title']
+
+    def get_pub_year(self):
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['pub_year']
+
+    def get_subtitle(self):
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['subtitle']
+
+    def get_publisher(self):
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['publisher']
+
+    def get_type(self):
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['type']
+
+    def get_subjects(self):
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['subjects']
+
+    def get_authors(self):
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['authors']
+
+    def get_container_title(self):
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['container_title']
+
+    def get_funders(self):
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['funders']
 
 class Dissemin(Common):
     def fetch(self):
@@ -219,7 +283,7 @@ class OadoiGS(Common):
         return r.text
 
 class Core(Common):
-    def __init__(self, doi):
+    def __init__(self, doi, init_metadata=False):
         super().__init__(doi)
         self.key = ''# lookup from config
 
@@ -290,28 +354,8 @@ class OAButton(Common):
             output["classification"] = "unknown"
         return output
 
-class Crossref(Common):
-    def fetch(self):
-        r = requests.get("https://api.crossref.org/works/{0}".format(self.doi))
-        if r.status_code == 200:
-            self.cache_response(r.text, self.cache_file)
-
-        return r.text
-
-    def parse(self):
-        # todo
-        return ""
-
-    def get_title(self):
-        # convenience method
-        return ""
-
-    def get_year(self):
-        # convenience method
-        return ""
-
 class MSAcademic(Common):
-    def __init__(self, doi):
+    def __init__(self, doi, init_metadata=False):
         super().__init__(doi)
         self.key = ''# lookup from config
         self.title = self.get_title
@@ -441,3 +485,81 @@ class Openaire(Common):
             if len(all_sources) > 0:
                 output["pref_pdf_url"] = self.clean_url(all_sources[0])
         return output
+
+# APIs for descriptive metadata
+
+class Crossref(Common):
+    def __init__(self, doi, init_metadata=True, cache_mode="fill"):
+        super().__init__(doi)
+        self.metadata = self.parse(cache_mode)
+
+    def fetch(self):
+        r = requests.get("https://api.crossref.org/works/{0}".format(self.doi))
+        if r.status_code == 200:
+            self.cache_response(r.text, self.cache_file)
+        else:
+            print(r.status_code)
+
+        return r.text
+
+    def parse(self, cache_mode="fill"):
+        raw = json.loads(self.response(cache_mode))
+        response = self.metadata_template
+
+        if 'message' in raw:
+            message = raw["message"]
+            if len(message["title"]) > 0:
+                response['title'] = message["title"][0]
+
+            if ('issued' in message) and ('date-parts' in message["issued"]) and (len(message['issued']['date-parts']) > 0):
+                response["pub_year"] = message['issued']['date-parts'][0][0]
+
+            if len(message["subtitle"]) > 0:
+                response['subtitle'] = message["subtitle"][0]
+
+            if "publisher" in message:
+                response['publisher'] = message['publisher']
+
+            if "type" in message:
+                response['type'] = message['type']
+
+            if 'subject' in message and len(message['subject']) > 0:
+                # return entire array for now
+                response['subjects'] = message['subject']
+
+            if 'author' in message and len(message['author']) > 0:
+                # return entire array for now
+                response['authors'] = message['author']
+
+            if 'container-title' in message and len(message['container-title']) > 0:
+                response['container_title'] = message['container-title'][0]
+
+            if 'funder' in message and len(message['funder']) > 0:
+                # return entire array for now
+                response['funders'] = message['funder']
+
+        return response
+
+class Datacite(Common):
+    def __init__(self, doi, init_metadata=True, cache_mode="fill"):
+        super().__init__(doi)
+        self.metadata = self.parse(cache_mode)
+
+    def fetch(self):
+        # TODO: insert Datacite api call here
+        #r = requests.get("https://api.crossref.org/works/{0}".format(self.doi))
+        #if r.status_code == 200:
+        #    self.cache_response(r.text, self.cache_file)
+        #else:
+        #    print(r.status_code)
+
+        #return r.text
+        return {}
+
+    def parse(self, cache_mode="fill"):
+        raw = json.loads(self.response(cache_mode))
+        response = self.metadata_template
+
+        # TODO: insert datacite parsing here
+
+        return response
