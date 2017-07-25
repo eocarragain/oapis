@@ -5,7 +5,7 @@ from itertools import zip_longest
 
 doi_summary_json_file = '../scopus_exports/html/doi_summary.json'
 # Setup a Solr instance. The timeout is optional.
-solr = pysolr.Solr('http://localhost:8983/solr/blacklight-core', timeout=10)
+solr = pysolr.Solr('http://localhost:8983/solr/blacklight-core', timeout=30)
 
 def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
@@ -16,7 +16,7 @@ def grouper(iterable, n, fillvalue=None):
 with open(doi_summary_json_file) as json_file:
     doi_summary = json.load(json_file)
 
-    groups = grouper(doi_summary.keys(), 1000)
+    groups = grouper(doi_summary.keys(), 500)
 
     for group in groups:
         solr_document = []
@@ -25,7 +25,7 @@ with open(doi_summary_json_file) as json_file:
                 continue
             #print(doi)
 
-            metadata = common.Crossref(doi)
+            metadata = common.Crossref(doi, False)
             solr_id = doi.replace("/", "_").replace(".", "-")
             title = metadata.get_title()
             pub_year = metadata.get_pub_year()
@@ -36,22 +36,29 @@ with open(doi_summary_json_file) as json_file:
             authors = metadata.get_authors()
             authors_simple = []
             orcids = []
-            for author in authors:
-                if 'given' in author:
-                    authors_simple.append(author['family'] + "," + author['given'])
-                else:
-                    authors_simple.append(author['family'])
+            if authors is not None:
+                for author in authors:
+                    if 'given' in author and 'family' in author:
+                        authors_simple.append(author['family'] + "," + author['given'])
+                    elif 'family' in author:
+                        authors_simple.append(author['family'])
 
-                if 'orcid' in author:
-                    orcids.append(author['orcid'])
+                    if 'orcid' in author:
+                        orcids.append(author['orcid'])
+            if len(authors_simple) > 0:
+                author = authors_simple[0]
+            else:
+                author = None
             container_title = metadata.get_container_title()
             funders = metadata.get_funders()
             funders_simple = []
             funder_awards = []
-            for funder in funders:
-                funders_simple.append(funder['name'])
-                if 'award' in funder:
-                    funder_awards.append(funder['award'])
+            if funders is not None:
+                for funder in funders:
+                    if 'name' in funder:
+                        funders_simple.append(funder['name'])
+                    if 'award' in funder:
+                        funder_awards.append(funder['award'])
 
             solr_document.append(
                 {
@@ -68,13 +75,15 @@ with open(doi_summary_json_file) as json_file:
                     "pref_pdf_urls_display": doi_summary[doi]['pref_pdf_urls'],
                     "sub_title_display": subtitle,
                     "published_display": publisher,
+                    "publisher_facet": publisher,
                     "format": resource_type,
                     "subject_topic_facet": subjects,
-                    "subject": subjects,
-                    "author": authors_simple,
-                    "author_facet": authors_simple
-                    "author_display": authors_simple,
-                    "author_sort": authors_simple,
+                    "subject_t": subjects,
+                    "author_t": authors_simple,
+                    "author_facet": authors_simple,
+                    "author_display": author,
+                    "authors_display": authors_simple,
+                    "author_sort": author,
                     "container_title_display": container_title,
                     "container_title_facet": container_title,
                     "funders_display": funders_simple,

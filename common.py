@@ -13,7 +13,7 @@ class Common(object):
         "title": None, # string, single value
         "pub_year": None, # int, single value
         "subtitle": None, # string, single value
-        "publiser": None, # string, single value
+        "publisher": None, # string, single value
         "type": None, # string, single value (currently crossref types)
         "subjects": None, # array of strings
         "authors": None, # array of author elements (currently crossref contributor type)
@@ -499,6 +499,7 @@ class Crossref(Common):
             self.cache_response(r.text, self.cache_file)
         else:
             print(r.status_code)
+            return json.dumps(self.metadata_template)
 
         return r.text
 
