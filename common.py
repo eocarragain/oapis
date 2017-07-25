@@ -7,6 +7,7 @@ import json
 import string
 import time
 import validators
+import re
 
 class Common(object):
     metadata_template = {
@@ -19,6 +20,7 @@ class Common(object):
         "authors": None, # array of author elements (currently crossref contributor type)
         "container_title": None, # string, single value
         "funders": None, # array of funding elements (currently crossref funder type)
+        "abstract": None, # string, single value
     }
 
     def __init__(self, doi, init_metadata=False):
@@ -183,6 +185,10 @@ class Common(object):
     def get_funders(self):
         self.metadata = self.metadata or self.fetch_metadata()
         return self.metadata['funders']
+
+    def get_abstract(self):
+        self.metadata = self.metadata or self.fetch_metadata()
+        return self.metadata['abstract']
 
 class Dissemin(Common):
     def fetch(self):
@@ -503,6 +509,9 @@ class Crossref(Common):
 
         return r.text
 
+    def remove_tags(self, text):
+        return re.compile(r'<[^>]+>').sub('', text)
+
     def parse(self, cache_mode="fill"):
         raw = json.loads(self.response(cache_mode))
         response = self.metadata_template
@@ -538,6 +547,10 @@ class Crossref(Common):
             if 'funder' in message and len(message['funder']) > 0:
                 # return entire array for now
                 response['funders'] = message['funder']
+
+            if 'abstract' in message:
+                # strip jats xml elements
+                response['abstract'] = self.remove_tags(message['abstract'])
 
         return response
 

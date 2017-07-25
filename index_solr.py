@@ -43,8 +43,8 @@ with open(doi_summary_json_file) as json_file:
                     elif 'family' in author:
                         authors_simple.append(author['family'])
 
-                    if 'orcid' in author:
-                        orcids.append(author['orcid'])
+                    if 'ORCID' in author:
+                        orcids.append(author['ORCID'])
             if len(authors_simple) > 0:
                 author = authors_simple[0]
             else:
@@ -59,6 +59,7 @@ with open(doi_summary_json_file) as json_file:
                         funders_simple.append(funder['name'])
                     if 'award' in funder:
                         funder_awards.append(funder['award'])
+            abstract = metadata.get_abstract()
 
             solr_document.append(
                 {
@@ -91,6 +92,8 @@ with open(doi_summary_json_file) as json_file:
                     "awards_display": funder_awards,
                     "orcid_display": orcids,
                     "orcid_facet": orcids,
+                    "abstract_t": abstract,
+                    "abstract_display": abstract,
                 },
             )
         solr.add(solr_document)
