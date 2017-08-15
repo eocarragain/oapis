@@ -25,7 +25,9 @@ irish_repos = {
     'tcd': 'www.tara.tcd.ie',
     'ucc': 'cora.ucc.ie',
     'ucd': 'researchrepository.ucd.ie',
-    'ul': 'ulir.ul.ie'
+    'ul': 'ulir.ul.ie',
+    'lenus': 'www.lenus.ie',
+    'teagasc': 't-stor.teagasc.ie'
 }
 
 
@@ -167,14 +169,13 @@ for api in df_filter.api.unique():
 
 # Stacked area-chart showing classification by year, trellised by api
 # Include a "merged" to show the most optimistic view across all apis
-df_doi_summary = pd.DataFrame()
+doi_summary_all_apis = []
 for doi in doi_summary:
-    #print(doi)
     doi_dict = doi_summary[doi]
     doi_dict['api'] = 'all apis combined'
-    df_doi_summary = df_doi_summary.append(doi_dict, ignore_index=True)
+    doi_summary_all_apis.append(doi_dict)
 
-
+df_doi_summary = pd.DataFrame(doi_summary_all_apis)
 df_doi_summary = df_doi_summary[df_doi_summary['year'] >= year_filter]
 df_doi_summary = df_doi_summary[['class', 'year', 'api']].groupby(['class', 'year', 'api']).size().to_frame("count").reset_index()
 
@@ -199,7 +200,6 @@ chart = Chart(df_process).mark_area(
 )
 chart_html_file = os.path.join(output_directory, 'class_by_year-stacked_area-api_trellis.html')
 write_chart_to_file(chart_html_file, chart)
-
 
 # Multi-line chart showing classification by year, trellised by affiliation
 def class_by_year_multi_line_trellis(df_filter,suffix="all_apis"):
@@ -317,6 +317,7 @@ doi_summary_counts = {
     "only_in_researchgate": 0,
     "in_researchgate": 0,
     "in_irish_repo": 0,
+    "only_irish_and_researchgate": 0,
 }
 
 irish_repo_domains = list(irish_repos.values())
@@ -378,6 +379,10 @@ for doi in doi_summary:
         doi_summary_counts["in_irish_repo"] += 1
         summary_series.append({"year": year, "series": "in_irish_repo"})
 
+    if len(domains) > 1 and "www.researchgate.net" in domains and no_of_irish_repos == len(domains) - 1 :
+        doi_summary_counts["only_irish_and_researchgate"] += 1
+        summary_series.append({"year": year, "series": "only_irish_and_researchgate"})
+
 def pge(total, sub):
     return (sub/total)*100
 
@@ -394,6 +399,7 @@ vals = [
     {"label": "Only in ResearchGate", "percent": pge(total, doi_summary_counts["only_in_researchgate"])},
     {"label": "In ResearchGate", "percent": pge(total, doi_summary_counts["in_researchgate"])},
     {"label": "In Irish repo", "percent": pge(total, doi_summary_counts["in_irish_repo"])},
+    {"label": "In Irish repo and ResearchGate", "percent": pge(total, doi_summary_counts["only_irish_and_researchgate"])},
 ]
 
 chart = Chart(Data(values=vals)).mark_bar().encode(
@@ -404,8 +410,8 @@ chart_html_file = os.path.join(output_directory, "doi_summary_counts-bar.html")
 write_chart_to_file(chart_html_file, chart)
 
 df_series = pd.DataFrame(summary_series)
-df_filter = df_series[df_series['year'] >= year_filter]
-df_process = df_filter.groupby(['series', 'year']).size().to_frame("count").reset_index()
+df_year_filter = df_series[df_series['year'] >= year_filter]
+df_process = df_year_filter .groupby(['series', 'year']).size().to_frame("count").reset_index()
 chart = Chart(df_process).mark_line().encode(
     color='series:N',
     x=X('year:T', timeUnit="year", axis=Axis(title='Year')),

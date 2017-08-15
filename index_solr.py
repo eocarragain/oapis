@@ -7,6 +7,7 @@ doi_summary_json_file = '../scopus_exports/html/doi_summary.json'
 # Setup a Solr instance. The timeout is optional.
 solr = pysolr.Solr('http://localhost:8983/solr/blacklight-core', timeout=30)
 
+
 def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
@@ -17,7 +18,7 @@ with open(doi_summary_json_file) as json_file:
     doi_summary = json.load(json_file)
 
     groups = grouper(doi_summary.keys(), 500)
-
+    index = 1
     for group in groups:
         solr_document = []
         for doi in group:
@@ -25,7 +26,7 @@ with open(doi_summary_json_file) as json_file:
                 continue
             #print(doi)
 
-            metadata = common.Crossref(doi, False)
+            metadata = common.Crossref(doi, False, "cache_only")
             solr_id = doi.replace("/", "_").replace(".", "-")
             title = metadata.get_title()
             pub_year = metadata.get_pub_year()
@@ -96,4 +97,11 @@ with open(doi_summary_json_file) as json_file:
                     "abstract_display": abstract,
                 },
             )
-        solr.add(solr_document)
+        file = "../scopus_exports/solr/group_{0}.json".format(str(index).zfill(3))
+        with open(file, 'w') as f:
+            json.dump(solr_document, f, ensure_ascii=False)
+
+        print("adding group {0}".format(index))
+        #solr.add(solr_document)
+        print("added group {0}".format(index))
+        index += 1
