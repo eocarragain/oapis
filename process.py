@@ -317,7 +317,7 @@ doi_summary_counts = {
     "only_in_researchgate": 0,
     "in_researchgate": 0,
     "in_irish_repo": 0,
-    "only_irish_and_researchgate": 0,
+    "only_irish_repos_excluding_researchgate": 0,
 }
 
 irish_repo_domains = list(irish_repos.values())
@@ -379,9 +379,9 @@ for doi in doi_summary:
         doi_summary_counts["in_irish_repo"] += 1
         summary_series.append({"year": year, "series": "in_irish_repo"})
 
-    if len(domains) > 1 and "www.researchgate.net" in domains and no_of_irish_repos == len(domains) - 1 :
-        doi_summary_counts["only_irish_and_researchgate"] += 1
-        summary_series.append({"year": year, "series": "only_irish_and_researchgate"})
+    if (len(domains) > 1 and "www.researchgate.net" in domains and no_of_irish_repos == len(domains) - 1) or len(domains) > 0 and no_of_irish_repos == len(domains):
+        doi_summary_counts["only_irish_repos_excluding_researchgate"] += 1
+        summary_series.append({"year": year, "series": "only_irish_repos_excluding_researchgate"})
 
 def pge(total, sub):
     return (sub/total)*100
@@ -399,7 +399,7 @@ vals = [
     {"label": "Only in ResearchGate", "percent": pge(total, doi_summary_counts["only_in_researchgate"])},
     {"label": "In ResearchGate", "percent": pge(total, doi_summary_counts["in_researchgate"])},
     {"label": "In Irish repo", "percent": pge(total, doi_summary_counts["in_irish_repo"])},
-    {"label": "In Irish repo and ResearchGate", "percent": pge(total, doi_summary_counts["only_irish_and_researchgate"])},
+    {"label": "Only Irish (excl ResearchGate)", "percent": pge(total, doi_summary_counts["only_irish_repos_excluding_researchgate"])},
 ]
 
 chart = Chart(Data(values=vals)).mark_bar().encode(
