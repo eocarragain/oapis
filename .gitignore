@@ -6,3 +6,7 @@ cache/*
 *.zip
 *.csv
 *.html
+index_solr_cached.py
+json2csv.py
+openaire.py
+scopus.py
