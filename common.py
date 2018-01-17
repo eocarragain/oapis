@@ -217,7 +217,7 @@ class Dissemin(Common):
 class Oadoi(Common):
     def fetch(self):
         # todo email
-        r = requests.get("https://api.oadoi.org/{0}".format(self.doi))
+        r = requests.get("https://api.oadoi.org/v2/{0}".format(self.doi))
         if r.status_code == 200:
             self.cache_response(r.text, self.cache_file)
 
@@ -237,7 +237,7 @@ class Oadoi(Common):
         host_type = result['best_oa_location']['host_type']
         if host_type == 'publisher':
             output["classification"] = "gold"
-        elif host_type == 'repository'
+        elif host_type == 'repository':
             output["classification"] = "green"
         else:
             output["classification"] = 'unknown'
