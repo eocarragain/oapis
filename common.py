@@ -226,7 +226,7 @@ class Oadoi(Common):
     def parse(self, cache_mode="fill"):
         output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
         result = json.loads(self.response(cache_mode))
-        if not 'best_oa_location' in result:
+        if not 'best_oa_location' in result or result['best_oa_location'] is None:
             return output
 
         has_open_url = False
