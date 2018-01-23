@@ -463,7 +463,7 @@ class Openaire(Common):
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         if has_open_url == True:
-            if bool(set(output["domains"]).intersection(['doi.org', 'doaj.org'])):
+            if bool(set(output["domains"]).intersection(['doi.org', 'doaj.org', 'biomedcentral.com'])):
                 output['classification'] = 'gold'
             else:
                 output['classification'] = 'green'
