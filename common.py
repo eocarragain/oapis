@@ -230,7 +230,7 @@ class Oadoi(Common):
             return output
 
         has_open_url = False
-        if 'url' in result['best_oa_location'] and result['best_oa_location']['url'] != None:
+        if 'url' in result['best_oa_location'] and result['best_oa_location']['url'] is not None:
             output["pref_pdf_url"] = self.clean_url(result['best_oa_location']['url'])
             has_open_url = True
 
@@ -463,7 +463,11 @@ class Openaire(Common):
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         if has_open_url == True:
-            output['classification'] = 'green'
+            if bool(set(output["domains"]).intersection(['doi.org', 'doaj.org'])):
+                output['classification'] = 'gold'
+            else:
+                output['classification'] = 'green'
+            
             if len(all_sources) > 0:
                 output["pref_pdf_url"] = self.clean_url(all_sources[0])
         return output
