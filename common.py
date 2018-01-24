@@ -58,7 +58,7 @@ class Common(object):
         handle_cache_dir = "{0}/handle".format(self.base_cache)
         os.makedirs(handle_cache_dir, exist_ok=True)
         handle_digest = hashlib.md5(handle_cache.encode('utf-8')).hexdigest()
-        handle_cache_file = os.path.join(handle_cache_dir, handle_digest + ".js$
+        handle_cache_file = os.path.join(handle_cache_dir, handle_digest + ".json")
         response = ""
         if os.path.isfile(handle_cache_file):
             print("handle cached")
