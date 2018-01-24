@@ -40,27 +40,6 @@ class Common(object):
         doi = doi.strip()
         return doi
 
-    # Helper method for robust http retries
-    # See https://www.peterbe.com/plog/best-practice-with-retries-with-requests
-    def requests_retry_session(
-        retries=3,
-        backoff_factor=0.5,
-        status_forcelist=(500, 502, 503, 504),
-        session=None,
-    ):
-        session = session or requests.Session()
-        retry = Retry(
-            total=retries,
-            read=retries,
-            connect=retries,
-            backoff_factor=backoff_factor,
-            status_forcelist=status_forcelist,
-        )
-        adapter = HTTPAdapter(max_retries=retry)
-        session.mount('http://', adapter)
-        session.mount('https://', adapter)
-        return session
-
     def create_cache_dir(self):
         os.makedirs(self.cache_dir, exist_ok=True)
 
@@ -238,7 +217,7 @@ class Dissemin(Common):
 class Oadoi(Common):
     def fetch(self):
         # todo email
-        r = requests.get("https://api.oadoi.org/{0}".format(self.doi))
+        r = requests.get("https://api.oadoi.org/v2/{0}".format(self.doi))
         if r.status_code == 200:
             self.cache_response(r.text, self.cache_file)
 
@@ -246,33 +225,30 @@ class Oadoi(Common):
 
     def parse(self, cache_mode="fill"):
         output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
-        raw = json.loads(self.response(cache_mode))
-        if not 'results' in raw:
-            output['classification'] = 'unknown'
+        result = json.loads(self.response(cache_mode))
+        if not 'best_oa_location' in result or result['best_oa_location'] is None:
             return output
 
         has_open_url = False
-        result = raw['results'][0]
-        if '_best_open_url' in result and result['_best_open_url'] != None:
-            output["pref_pdf_url"] = self.clean_url(result['_best_open_url'])
+        if 'url' in result['best_oa_location'] and result['best_oa_location']['url'] is not None:
+            output["pref_pdf_url"] = self.clean_url(result['best_oa_location']['url'])
             has_open_url = True
 
-        if 'oa_color' in result and result['oa_color'] != None:
-            if result['oa_color'] == 'gold':
-                output["classification"] = "gold"
-            elif has_open_url == True:
-                output["classification"] = "green"
-            else:
-                output["classification"] = 'unknown'
+        host_type = result['best_oa_location']['host_type']
+        if host_type == 'publisher':
+            output["classification"] = "gold"
+        elif host_type == 'repository':
+            output["classification"] = "green"
         else:
             output["classification"] = 'unknown'
 
         all_sources = []
-        if "_open_urls" in result:
-            for open_url in result["_open_urls"]:
-                clean = self.clean_url(open_url)
-                if clean != False:
-                    all_sources.append(clean)
+        if "oa_locations" in result:
+            for oa_location in result["oa_locations"]:
+                if "url" in oa_location:
+                    clean = self.clean_url(oa_location["url"])
+                    if clean != False:
+                        all_sources.append(clean)
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         return output
@@ -487,7 +463,11 @@ class Openaire(Common):
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         if has_open_url == True:
-            output['classification'] = 'green'
+            if bool(set(output["domains"]).intersection(['doi.org', 'doaj.org', 'www.biomedcentral.com', 'www.scopus.com'])):
+                output['classification'] = 'gold'
+            else:
+                output['classification'] = 'green'
+            
             if len(all_sources) > 0:
                 output["pref_pdf_url"] = self.clean_url(all_sources[0])
         return output
