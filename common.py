@@ -48,14 +48,17 @@ class Common(object):
         file.write(response_body)
         file.close()
 
-    def handle_lookup(self, handle):
+    def handle_lookup(self, handle, prefix_only=False):
         #return handle
         #todo verify handle format with regex
-        handle_prefix = handle[:handle.rfind('/')].replace("https", "http")
+        if prefix_only == True:
+            handle_cache = handle[:handle.rfind('/')].replace("https", "http")
+        else:
+            handle_cache = handle.replace("https", "http")
         handle_cache_dir = "{0}/handle".format(self.base_cache)
         os.makedirs(handle_cache_dir, exist_ok=True)
-        handle_digest = hashlib.md5(handle_prefix.encode('utf-8')).hexdigest()
-        handle_cache_file = os.path.join(handle_cache_dir, handle_digest + ".json")
+        handle_digest = hashlib.md5(handle_cache.encode('utf-8')).hexdigest()
+        handle_cache_file = os.path.join(handle_cache_dir, handle_digest + ".js$
         response = ""
         if os.path.isfile(handle_cache_file):
             print("handle cached")
@@ -82,8 +85,6 @@ class Common(object):
         if validators.url(url) != True:
             return False
 
-        if "hdl.handle.net" in url:
-            url = self.handle_lookup(url)
         url = url.replace("dx.doi.org", "doi.org")
         url = url.replace("eprints.nuim.ie", "eprints.maynoothuniversity.ie")
         return url
@@ -105,6 +106,9 @@ class Common(object):
     def unique_domains(self, all_sources):
         domains = []
         for source in all_sources:
+            if "hdl.handle.net" in source:
+                source = self.handle_lookup(source, True)
+
             try:
                 source_parts = source.split("/")
             except:
