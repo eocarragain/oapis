@@ -221,14 +221,14 @@ class Dissemin(Common):
 class Oadoi(Common):
     def fetch(self):
         # todo email
-        r = requests.get("https://api.oadoi.org/v2/{0}".format(self.doi))
+        r = requests.get("https://api.oadoi.org/v2/{0}?email=example@example.ie".format(self.doi))
         if r.status_code == 200:
             self.cache_response(r.text, self.cache_file)
 
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
+        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None, 'in_repo': 'false', 'in_cora': 'false' }
         result = json.loads(self.response(cache_mode))
         if not 'best_oa_location' in result or result['best_oa_location'] is None:
             return output
@@ -253,6 +253,11 @@ class Oadoi(Common):
                     clean = self.clean_url(oa_location["url"])
                     if clean != False:
                         all_sources.append(clean)
+                        if 'cora.ucc.ie' in clean or 'hdl.handle.net/10468' in clean:
+                           output["in_cora"] = 'true'
+                if  "host_type" in oa_location:
+                    if oa_location["host_type"] == "repository":
+                        output["in_repo"] = 'true'
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         return output
@@ -409,19 +414,21 @@ class Openaire(Common):
         # we need to give it time to recover
         r = requests.get("http://api.openaire.eu/search/publications?doi={0}&format=json".format(self.doi))
         if r.status_code == 200:
+            print('status 200')
             self.cache_response(r.text, self.cache_file)
         else:
             print(r.status_code)
         return r.text
 
     def parse(self, cache_mode="fill"):
-        output = { 'doi' : self.doi, 'classification': 'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None }
+        output = { 'doi' : self.doi, 'classification':'unknown', 'all_sources': [], 'domains': [], 'pref_pdf_url': None, 'in_repo':'false', 'in_cora': 'false' }
         try:
             raw = json.loads(self.response(cache_mode))
         except:
             return output
-
+        print('parsing openaire')
         if not 'response' in raw or raw['response']['results'] == None:
+            print('no response')
             output['classification'] = 'unknown'
             return output
 
@@ -431,12 +438,19 @@ class Openaire(Common):
         # result can be a single node or an array
         result_array = []
         if 'result' in raw['response']['results']:
+          print('found results')
           if 'metadata' in raw['response']['results']['result']:
+              print('found metadata in result')
               result_array.append(raw['response']['results']['result'])
           elif len(raw['response']['results']['result']) > 1:
+              print('found multiple results')
               result_array = raw['response']['results']['result']
+          elif 'metadata' in raw['response']['results']['result'][0]:
+              result_array = raw['response']['results']['result']
+              print('multiple child resuls under result')
 
           for result in result_array:
+              print("in results")
               children = result['metadata']['oaf:entity']['oaf:result']['children']
               #print(result['metadata']['oaf:entity']['oaf:result']['children'])
               if 'instance' in children:
@@ -446,10 +460,12 @@ class Openaire(Common):
                       instance_array.append(children["instance"])
                   elif len(children["instance"]) > 0:
                       instance_array = children["instance"]
+                  elif '@id' in children["instance"][0]:
+                       instance_array = children["instance"]
 
                   for node in instance_array:
-                      if 'licence' in node:
-                          if node['licence']['@classid'] == "OPEN":
+                      if 'accessright' in node:
+                          if node['accessright']['@classid'] == "OPEN":
                               has_open_url = True
                               # webresource can be a single node or an array of node
                               webresource_array = []
@@ -458,12 +474,15 @@ class Openaire(Common):
                                       webresource_array.append(node['webresource'])
                                   elif len(node['webresource']) > 0:
                                       webresource_array = node['webresource']
-
+                                  elif 'url' in node['webresource'][0]:
+                                      webresource_array = node['webresource']
                                   for resource in webresource_array:
                                       open_url = resource['url']['$']
                                       clean = self.clean_url(open_url)
                                       if clean != False:
                                           all_sources.append(clean)
+                                          if 'cora.ucc.ie' in clean or 'hdl.handle.net/10468' in clean:
+                                              output["in_cora"] = 'true'
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
         if has_open_url == True:
@@ -471,7 +490,7 @@ class Openaire(Common):
                 output['classification'] = 'gold'
             else:
                 output['classification'] = 'green'
-            
+                output['in_repo'] = 'true'
             if len(all_sources) > 0:
                 output["pref_pdf_url"] = self.clean_url(all_sources[0])
         return output
