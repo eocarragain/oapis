@@ -217,7 +217,6 @@ class Dissemin(Common):
         return output
 
 
-
 class Oadoi(Common):
     def fetch(self):
         # todo email
@@ -435,6 +434,9 @@ class Openaire(Common):
               result_array.append(raw['response']['results']['result'])
           elif len(raw['response']['results']['result']) > 1:
               result_array = raw['response']['results']['result']
+          elif 'metadata' in raw['response']['results']['result'][0]:
+              result_array = raw['response']['results']['result']
+
 
           for result in result_array:
               children = result['metadata']['oaf:entity']['oaf:result']['children']
@@ -446,10 +448,12 @@ class Openaire(Common):
                       instance_array.append(children["instance"])
                   elif len(children["instance"]) > 0:
                       instance_array = children["instance"]
+                  elif '@id' in children["instance"][0]:
+                       instance_array = children["instance"]
 
                   for node in instance_array:
-                      if 'licence' in node:
-                          if node['licence']['@classid'] == "OPEN":
+                      if 'accessright' in node:
+                          if node['accessright']['@classid'] == "OPEN":
                               has_open_url = True
                               # webresource can be a single node or an array of node
                               webresource_array = []
@@ -457,6 +461,8 @@ class Openaire(Common):
                                   if 'url' in node['webresource']:
                                       webresource_array.append(node['webresource'])
                                   elif len(node['webresource']) > 0:
+                                      webresource_array = node['webresource']
+                                  elif 'url' in node['webresource'][0]:
                                       webresource_array = node['webresource']
 
                                   for resource in webresource_array:
