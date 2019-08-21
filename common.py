@@ -44,7 +44,7 @@ class Common(object):
         os.makedirs(self.cache_dir, exist_ok=True)
 
     def cache_response(self, response_body, file):
-        file = open(file, "w")
+        file = open(file, "w", encoding="utf-8")
         file.write(response_body)
         file.close()
 
@@ -417,6 +417,7 @@ class Openaire(Common):
             print('status 200')
             self.cache_response(r.text, self.cache_file)
         else:
+            print('##################### NON-200 code: {}'.format(r.status_code))
             print(r.status_code)
         return r.text
 
@@ -438,19 +439,19 @@ class Openaire(Common):
         # result can be a single node or an array
         result_array = []
         if 'result' in raw['response']['results']:
-          print('found results')
+          #print('found results')
           if 'metadata' in raw['response']['results']['result']:
-              print('found metadata in result')
+              #print('found metadata in result')
               result_array.append(raw['response']['results']['result'])
           elif len(raw['response']['results']['result']) > 1:
-              print('found multiple results')
+              #print('found multiple results')
               result_array = raw['response']['results']['result']
           elif 'metadata' in raw['response']['results']['result'][0]:
               result_array = raw['response']['results']['result']
-              print('multiple child resuls under result')
+              #print('multiple child resuls under result')
 
           for result in result_array:
-              print("in results")
+              #print("in results")
               children = result['metadata']['oaf:entity']['oaf:result']['children']
               #print(result['metadata']['oaf:entity']['oaf:result']['children'])
               if 'instance' in children:
@@ -464,6 +465,7 @@ class Openaire(Common):
                        instance_array = children["instance"]
 
                   for node in instance_array:
+                      #print("in instance_array")
                       if 'accessright' in node:
                           if node['accessright']['@classid'] == "OPEN":
                               has_open_url = True
@@ -477,11 +479,15 @@ class Openaire(Common):
                                   elif 'url' in node['webresource'][0]:
                                       webresource_array = node['webresource']
                                   for resource in webresource_array:
+                                      #print('in webresource_array')
                                       open_url = resource['url']['$']
+                                      #print(open_url)
                                       clean = self.clean_url(open_url)
+                                      #print(clean)
                                       if clean != False:
                                           all_sources.append(clean)
                                           if 'cora.ucc.ie' in clean or 'hdl.handle.net/10468' in clean:
+                                              print("is in cora")
                                               output["in_cora"] = 'true'
         output["all_sources"] = all_sources
         output["domains"] = self.unique_domains(all_sources)
